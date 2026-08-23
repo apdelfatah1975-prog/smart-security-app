@@ -1,0 +1,1 @@
+ALTER TABLE `allowedTechnicianAccounts` ADD COLUMN IF NOT EXISTS `menuPermissions` text NOT NULL DEFAULT '["workOrders"]';
