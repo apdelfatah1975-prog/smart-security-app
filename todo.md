@@ -274,3 +274,29 @@
 - [ ] تنفيذ git push origin main.
 - [ ] مطابقة آخر commit محلي مع origin/main والتحقق من نظافة شجرة العمل.
 - [ ] تأكيد انتهاء الرفع للمستخدم دون عرض أي رمز وصول.
+
+
+## محاولة ضبط origin ورفع main
+- [ ] تثبيت رابط origin النظيف لمستودع smart-security-life.
+- [ ] تشغيل gh auth setup-git.
+- [ ] تنفيذ git push origin main والتحقق من النتيجة.
+
+
+## فحص صلاحيات GitHub وفرع update-v2
+- [ ] فحص المستخدم الحالي عبر GitHub API.
+- [ ] فحص صلاحيات الحساب على مستودع smart-security-life.
+- [ ] إنشاء فرع update-v2 من الحالة المحلية الحالية.
+- [ ] رفع update-v2 إلى origin والتحقق من النتيجة.
+
+
+## إنشاء مستودع GitHub ورفع المشروع
+- [ ] فحص حالة المستودع المحلي والفرع الحالي قبل الإنشاء.
+- [ ] تنفيذ gh repo create smart-security-life --public --source=. --remote=origin --push.
+- [ ] التحقق من رابط المستودع والفرع البعيد وآخر commit بعد العملية.
+
+
+## إعادة ضبط origin وforce push إلى main
+- [ ] إزالة origin القديم وإضافته بالرابط الرسمي للمستودع.
+- [ ] تحويل الفرع المحلي إلى main.
+- [ ] تنفيذ git push -u origin main --force.
+- [ ] التحقق من آخر commit على origin/main وحالة النقل.
