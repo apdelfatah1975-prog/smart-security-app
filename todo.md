@@ -300,3 +300,10 @@
 - [ ] تحويل الفرع المحلي إلى main.
 - [ ] تنفيذ git push -u origin main --force.
 - [ ] التحقق من آخر commit على origin/main وحالة النقل.
+
+
+## الرفع إلى smart-security-app
+- [ ] توجيه origin إلى smart-security-app.
+- [ ] توحيد الفرع المحلي على main.
+- [ ] تنفيذ force push إلى smart-security-app/main.
+- [ ] التحقق من آخر commit والرابط البعيد ونظافة شجرة العمل.
