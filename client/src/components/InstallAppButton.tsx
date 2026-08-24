@@ -14,7 +14,7 @@ type InstallAppButtonProps = {
 };
 
 const TECHNICIAN_MANIFEST = "/technician-app/technician-manifest.webmanifest";
-const ADMIN_MANIFEST = "/manifest.webmanifest";
+const ADMIN_MANIFEST = "/manifest.json";
 
 export function InstallAppButton({ compact = false, technician = false }: InstallAppButtonProps) {
   const [installEvent, setInstallEvent] = useState<InstallPromptEvent | null>(null);

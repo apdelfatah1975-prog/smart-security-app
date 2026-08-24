@@ -15,7 +15,7 @@ export default function TechnicianLogin() {
 
   useEffect(() => {
     const manifest = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
-    const previousHref = manifest?.getAttribute("href") ?? "/manifest.webmanifest";
+    const previousHref = manifest?.getAttribute("href") ?? "/manifest.json";
     const previousTitle = document.title;
     if (manifest) manifest.href = "/technician-app/technician-manifest.webmanifest";
     document.title = "دخول الفني | نقطة نقاء";

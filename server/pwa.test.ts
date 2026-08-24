@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { runInNewContext } from "node:vm";
 import { describe, expect, it, vi } from "vitest";
@@ -36,7 +36,7 @@ async function executeNavigation(handler: FetchHandler) {
 
 describe("عامل خدمة الإدارة الذكية القابل للتثبيت", () => {
   it("يجهز manifest عربي مستقل مع مشاركة آمنة", () => {
-    const manifest = JSON.parse(readFileSync(path.resolve(import.meta.dirname, "../client/public/manifest.webmanifest"), "utf8")) as Record<string, any>;
+    const manifest = JSON.parse(readFileSync(path.resolve(import.meta.dirname, "../client/public/manifest.json"), "utf8")) as Record<string, any>;
     expect(manifest.name).toContain("الإدارة الذكية");
     expect(manifest.lang).toBe("ar");
     expect(manifest.dir).toBe("rtl");
@@ -45,14 +45,23 @@ describe("عامل خدمة الإدارة الذكية القابل للتثب�
     expect(manifest.share_target.action).toBe("/");
     expect(manifest.share_target.params.url).toBe("url");
     expect(manifest.display).toBe("standalone");
+    expect(manifest.icons).toEqual([
+      { src: "/icon.png", sizes: "192x192", type: "image/png", purpose: "any maskable" },
+      { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any maskable" },
+    ]);
+    expect(existsSync(path.resolve(import.meta.dirname, "../client/public/icon.png"))).toBe(true);
+    expect(existsSync(path.resolve(import.meta.dirname, "../client/public/icon-512.png"))).toBe(true);
   });
 
   it("يربط غلاف HTML بالعامل الخدمي والأيقونة العربية", () => {
     const indexHtml = readFileSync(path.resolve(import.meta.dirname, "../client/index.html"), "utf8");
     const mainSource = readFileSync(path.resolve(import.meta.dirname, "../client/src/main.tsx"), "utf8");
     const serviceWorker = readFileSync(path.resolve(import.meta.dirname, "../client/public/sw.js"), "utf8");
-    expect(indexHtml).toContain("/manifest.webmanifest");
-    expect(indexHtml).toContain("/app-icon.svg");
+    expect(indexHtml).toContain("/manifest.json");
+    expect(indexHtml).toContain('rel="icon" href="/icon.png" type="image/png"');
+    expect(indexHtml).toContain('rel="apple-touch-icon" href="/icon-512.png"');
+    expect(serviceWorker).toContain('"/icon.png"');
+    expect(serviceWorker).toContain('"/icon-512.png"');
     expect(mainSource).toContain('navigator.serviceWorker.register("/sw.js",');
     expect(serviceWorker).toContain('const APP_SHELL = ["/"');
   });

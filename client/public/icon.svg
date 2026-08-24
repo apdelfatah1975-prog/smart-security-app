@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">الإدارة الذكية والأمن</title>
+  <desc id="desc">درع أمان بلون زيتي داكن ولمسات ذهبية</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#344933"/>
+      <stop offset="0.52" stop-color="#202f24"/>
+      <stop offset="1" stop-color="#142018"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f4d98a"/>
+      <stop offset="0.45" stop-color="#d5ad55"/>
+      <stop offset="1" stop-color="#a97925"/>
+    </linearGradient>
+    <linearGradient id="shield" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#5b744b"/>
+      <stop offset="0.5" stop-color="#304932"/>
+      <stop offset="1" stop-color="#1b2b20"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="38%" r="62%">
+      <stop offset="0" stop-color="#d6b15d" stop-opacity="0.17"/>
+      <stop offset="1" stop-color="#d6b15d" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="170%">
+      <feDropShadow dx="0" dy="22" stdDeviation="22" flood-color="#07110b" flood-opacity="0.48"/>
+    </filter>
+  </defs>
+  <rect x="18" y="18" width="988" height="988" rx="214" fill="url(#bg)"/>
+  <rect x="43" y="43" width="938" height="938" rx="190" fill="none" stroke="#d6b15d" stroke-opacity="0.24" stroke-width="4"/>
+  <circle cx="512" cy="454" r="360" fill="url(#glow)"/>
+  <path d="M178 774c124 76 256 112 334 112s210-36 334-112" fill="none" stroke="#d6b15d" stroke-opacity="0.14" stroke-width="8" stroke-linecap="round"/>
+  <g filter="url(#shadow)">
+    <path d="M512 154 790 254v230c0 201-116 318-278 386-162-68-278-185-278-386V254z" fill="url(#shield)" stroke="url(#gold)" stroke-width="20" stroke-linejoin="round"/>
+    <path d="M512 205 738 286v193c0 163-88 255-226 322-138-67-226-159-226-322V286z" fill="none" stroke="#f2d784" stroke-opacity="0.28" stroke-width="7" stroke-linejoin="round"/>
+    <path d="M512 251v390" stroke="#f2d784" stroke-opacity="0.16" stroke-width="6" stroke-linecap="round"/>
+    <path d="M321 444h382" stroke="#f2d784" stroke-opacity="0.16" stroke-width="6" stroke-linecap="round"/>
+    <path d="M512 286 543 366l84 2-66 53 22 82-71-46-71 46 22-82-66-53 84-2z" fill="url(#gold)" opacity="0.96"/>
+    <rect x="420" y="504" width="184" height="143" rx="28" fill="#17241b" stroke="url(#gold)" stroke-width="14"/>
+    <path d="M459 504v-38c0-59 33-96 53-96s53 37 53 96v38" fill="none" stroke="url(#gold)" stroke-width="18" stroke-linecap="round"/>
+    <circle cx="512" cy="565" r="16" fill="#f4d98a"/>
+    <path d="M512 581v34" stroke="#f4d98a" stroke-width="14" stroke-linecap="round"/>
+  </g>
+  <circle cx="512" cy="111" r="10" fill="#d6b15d" opacity="0.82"/>
+  <circle cx="512" cy="913" r="10" fill="#d6b15d" opacity="0.52"/>
+</svg>

@@ -20,8 +20,8 @@ export async function showDeviceReminderNotification(customerName: string, tag: 
   if (getDeviceNotificationPermission() !== "granted") return false;
   const options = {
     body: `موعد متابعة ${customerName} أصبح جاهزًا للمتابعة.`,
-    icon: "/app-icon.svg",
-    badge: "/app-icon.svg",
+    icon: "/icon.png",
+    badge: "/icon.png",
     tag,
     data: { url: "/reminders" },
   };
@@ -42,8 +42,8 @@ export async function showDeviceWorkOrderNotification(customerName: string, tag:
   if (getDeviceNotificationPermission() !== "granted") return false;
   const options = {
     body: `يوجد أمر عمل جديد للعميل ${customerName}.`,
-    icon: "/app-icon.svg",
-    badge: "/app-icon.svg",
+    icon: "/icon.png",
+    badge: "/icon.png",
     tag,
     data: { url: "/work-orders" },
   };

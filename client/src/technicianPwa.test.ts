@@ -5,7 +5,7 @@ const readProjectFile = (relativePath: string) => readFileSync(new URL(relativeP
 
 describe("تجهيز PWA الإدارة الذكية", () => {
   it("يستخدم manifest عربي مستقل للتطبيق الرئيسي", () => {
-    const manifest = JSON.parse(readProjectFile("../public/manifest.webmanifest")) as {
+    const manifest = JSON.parse(readProjectFile("../public/manifest.json")) as {
       id: string;
       start_url: string;
       scope: string;

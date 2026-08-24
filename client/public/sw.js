@@ -1,7 +1,8 @@
-const CACHE_NAME = "smart-security-life-shell-v1";
+const CACHE_NAME = "smart-security-life-shell-v2";
 const APP_SHELL = ["/",
-  "/manifest.webmanifest",
-  "/app-icon.svg",
+  "/manifest.json",
+  "/icon.png",
+  "/icon-512.png",
 ];
 
 self.addEventListener("install", event => {
