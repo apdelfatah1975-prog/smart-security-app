@@ -54,6 +54,8 @@ const ownerIdFrom = (user: { id: number }) => user.id;
 
 const imageDataUrl = z.string().regex(/^data:image\/(?:jpg|jpeg|png|webp|heic|heif);base64,[A-Za-z0-9+/=\r\n]+$/i, "صيغة الصورة غير صالحة.");
 
+export function parseClientId(value: unknown): number | null { const raw = String(value ?? "").trim(); if (!raw || raw.startsWith("-")) return null; const match = raw.match(/(\d+)$/); const parsed = Number(match?.[1] ?? raw); return Number.isInteger(parsed) && parsed > 0 ? parsed : null; }
+
 function decodeImageDataUrl(value: string) {
   const normalized = value.replace(/\r?\n|\r/g, "").replace(/^data:image\/jpg;/i, "data:image/jpeg;");
   const match = normalized.match(/^data:(image\/(?:jpeg|png|webp|heic|heif));base64,([A-Za-z0-9+/=]+)$/i);
@@ -97,55 +99,57 @@ export const smartSecurityRouter = router({
     const ownerId = ctx.user.id;
     const p = input.payload;
     const text = (key: string) => typeof p[key] === "string" && p[key] !== "" ? String(p[key]) : null;
+    const numericId = (key: string) => parseClientId(text(key) ?? p[key]);
+    const requiredId = (key: string) => { const value = numericId(key); if (!value) throw new TRPCError({ code: "BAD_REQUEST", message: "المعرف المرتبط بالسجل غير صالح." }); return value; };
     const date = (key: string) => { const value = text(key); return value ? new Date(value) : null; };
     if (input.entity === "staff") {
-      const result = await db.insert(securityStaff).values({ ownerId, staffCode: text("code") || `staff-${Date.now()}`, fullName: text("name") || "فرد أمن", nationalId: text("nationalId"), phone: text("phone"), branch: text("branch") || "غير محدد", atmLocation: text("atm"), shift: (text("shift") as "morning" | "evening" | "night" | "off" | null) || "morning", hireDate: date("hireDate"), workStartDate: date("workStartDate"), emergencyPhone: text("emergencyPhone"), photoUrl: text("image")?.startsWith("http") || text("image")?.startsWith("/manus-storage/") ? text("image") : null, licenseStatus: text("licenseStatus") === "licensed" ? "licensed" : "unlicensed", weaponNumber: text("weaponNumber"), licenseNumber: text("licenseNumber"), licenseExpiry: date("licenseExpiry"), retirementDate: date("retirementDate"), monthlyRate: Number(p.rate) || 0, isActive: p.active !== false, notes: text("notes") });
-      return { entity: input.entity, id: Number(result[0].insertId), success: true } as const;
+      const result = await db.insert(securityStaff).values({ ownerId, staffCode: text("code") || `staff-${Date.now()}`, fullName: text("name") || "فرد أمن", nationalId: text("nationalId"), phone: text("phone"), branch: text("branch") || "غير محدد", atmLocation: text("atm"), shift: (text("shift") as "morning" | "evening" | "night" | "off" | null) || "morning", hireDate: date("hireDate"), workStartDate: date("workStartDate"), emergencyPhone: text("emergencyPhone"), photoUrl: text("image")?.startsWith("http") || text("image")?.startsWith("/manus-storage/") ? text("image") : null, licenseStatus: text("licenseStatus") === "licensed" ? "licensed" : "unlicensed", weaponNumber: text("weaponNumber"), licenseNumber: text("licenseNumber"), licenseExpiry: date("licenseExpiry"), retirementDate: date("retirementDate"), monthlyRate: Number(p.rate) || 0, isActive: p.active !== false, notes: text("notes") }).returning({ id: securityStaff.id });
+      return { entity: input.entity, id: Number(result[0]?.id), success: true } as const;
     }
     if (input.entity === "attendance") {
-      const result = await db.insert(securityAttendance).values({ ownerId, staffId: Number(p.staffId), attendanceDate: date("date") || new Date(), shift: (text("shift") as "morning" | "evening" | "night" | "off" | "leave") || "morning", status: (text("status") as "present" | "absent" | "excused") || "present", hours: Number(p.hours) || 0, notes: text("notes") });
-      return { entity: input.entity, id: Number(result[0].insertId), success: true } as const;
+      const result = await db.insert(securityAttendance).values({ ownerId, staffId: requiredId("staffId"), attendanceDate: date("date") || new Date(), shift: (text("shift") as "morning" | "evening" | "night" | "off" | "leave") || "morning", status: (text("status") as "present" | "absent" | "excused") || "present", hours: Number(p.hours) || 0, notes: text("notes") }).returning({ id: securityAttendance.id });
+      return { entity: input.entity, id: Number(result[0]?.id), success: true } as const;
     }
     if (input.entity === "patrols") {
-      const result = await db.insert(securityPatrols).values({ ownerId, staffId: text("staffId") ? Number(p.staffId) : null, branch: text("branch") || "غير محدد", patrolDate: date("date") || new Date(), checkpoint: text("checkpoint"), notes: text("notes"), photoUrl: text("photo")?.startsWith("http") || text("photo")?.startsWith("/manus-storage/") ? text("photo") : null });
-      return { entity: input.entity, id: Number(result[0].insertId), success: true } as const;
+      const result = await db.insert(securityPatrols).values({ ownerId, staffId: numericId("staffId"), branch: text("branch") || "غير محدد", patrolDate: date("date") || new Date(), checkpoint: text("checkpoint"), notes: text("notes"), photoUrl: text("photo")?.startsWith("http") || text("photo")?.startsWith("/manus-storage/") ? text("photo") : null }).returning({ id: securityPatrols.id });
+      return { entity: input.entity, id: Number(result[0]?.id), success: true } as const;
     }
     if (input.entity === "patrolPlans") {
-      const result = await db.insert(securityPatrolPlans).values({ ownerId, staffId: text("staffId") ? Number(p.staffId) : null, branch: text("branch") || "غير محدد", checkpoint: text("checkpoint") || "غير محدد", planDate: date("date") || new Date(), shift: (text("shift") as "morning" | "evening" | "night" | "off") || "morning", repeatWeekly: p.repeatWeekly === true, notes: text("notes") });
-      return { entity: input.entity, id: Number(result[0].insertId), success: true } as const;
+      const result = await db.insert(securityPatrolPlans).values({ ownerId, staffId: numericId("staffId"), branch: text("branch") || "غير محدد", checkpoint: text("checkpoint") || "غير محدد", planDate: date("date") || new Date(), shift: (text("shift") as "morning" | "evening" | "night" | "off") || "morning", repeatWeekly: p.repeatWeekly === true, notes: text("notes") }).returning({ id: securityPatrolPlans.id });
+      return { entity: input.entity, id: Number(result[0]?.id), success: true } as const;
     }
     if (input.entity === "workLocations") {
-      const result = await db.insert(securityWorkLocations).values({ ownerId, staffId: Number(p.staffId), locationName: text("location") || "غير محدد", fromDate: date("fromDate") || new Date(), toDate: date("toDate"), transferReason: text("reason"), notes: text("notes") });
-      return { entity: input.entity, id: Number(result[0].insertId), success: true } as const;
+      const result = await db.insert(securityWorkLocations).values({ ownerId, staffId: requiredId("staffId"), locationName: text("location") || "غير محدد", fromDate: date("fromDate") || new Date(), toDate: date("toDate"), transferReason: text("reason"), notes: text("notes") }).returning({ id: securityWorkLocations.id });
+      return { entity: input.entity, id: Number(result[0]?.id), success: true } as const;
     }
     if (input.entity === "entries") {
-      const result = await db.insert(financeEntries).values({ ownerId, entryType: text("type") === "expense" ? "expense" : "income", category: text("category") || "عام", amount: Math.max(0, Number(p.amount) || 0), entryDate: date("date") || new Date(), description: text("notes") });
-      return { entity: input.entity, id: Number(result[0].insertId), success: true } as const;
+      const result = await db.insert(financeEntries).values({ ownerId, entryType: text("type") === "expense" ? "expense" : "income", category: text("category") || "عام", amount: Math.max(0, Number(p.amount) || 0), entryDate: date("date") || new Date(), description: text("notes") }).returning({ id: financeEntries.id });
+      return { entity: input.entity, id: Number(result[0]?.id), success: true } as const;
     }
     if (input.entity === "debts") {
       const totalAmount = Math.max(0, Number(p.total) || 0); const paidAmount = Math.max(0, Number(p.paid) || 0);
-      const result = await db.insert(debts).values({ ownerId, personName: text("name") || "غير محدد", direction: text("direction") === "payable" ? "payable" : "receivable", totalAmount, paidAmount, dueDate: date("due"), status: paidAmount >= totalAmount ? "settled" : paidAmount > 0 ? "partial" : "open", notes: text("notes") });
-      return { entity: input.entity, id: Number(result[0].insertId), success: true } as const;
+      const result = await db.insert(debts).values({ ownerId, personName: text("name") || "غير محدد", direction: text("direction") === "payable" ? "payable" : "receivable", totalAmount, paidAmount, dueDate: date("due"), status: paidAmount >= totalAmount ? "settled" : paidAmount > 0 ? "partial" : "open", notes: text("notes") }).returning({ id: debts.id });
+      return { entity: input.entity, id: Number(result[0]?.id), success: true } as const;
     }
     if (input.entity === "children") {
-      const result = await db.insert(children).values({ ownerId, fullName: text("name") || "ابن/ابنة", grade: text("grade"), school: text("school"), phone: text("phone"), notes: text("notes") });
-      return { entity: input.entity, id: Number(result[0].insertId), success: true } as const;
+      const result = await db.insert(children).values({ ownerId, fullName: text("name") || "ابن/ابنة", grade: text("grade"), school: text("school"), phone: text("phone"), notes: text("notes") }).returning({ id: children.id });
+      return { entity: input.entity, id: Number(result[0]?.id), success: true } as const;
     }
     if (input.entity === "teachers") {
-      const result = await db.insert(teachers).values({ ownerId, fullName: text("name") || "مدرس", subject: text("subject") || "عام", phone: text("phone"), monthlyCost: Math.max(0, Number(p.cost) || 0), notes: text("notes") });
-      return { entity: input.entity, id: Number(result[0].insertId), success: true } as const;
+      const result = await db.insert(teachers).values({ ownerId, fullName: text("name") || "مدرس", subject: text("subject") || "عام", phone: text("phone"), monthlyCost: Math.max(0, Number(p.cost) || 0), notes: text("notes") }).returning({ id: teachers.id });
+      return { entity: input.entity, id: Number(result[0]?.id), success: true } as const;
     }
     if (input.entity === "lessons") {
-      const result = await db.insert(lessons).values({ ownerId, childId: Number(p.childId), teacherId: text("teacherId") ? Number(p.teacherId) : null, subject: text("subject") || "درس", lessonDate: date("date") || new Date(), durationMinutes: 60, cost: Math.max(0, Number(p.cost) || 0), status: text("status") === "completed" ? "completed" : "scheduled", notes: text("notes") });
-      return { entity: input.entity, id: Number(result[0].insertId), success: true } as const;
+      const result = await db.insert(lessons).values({ ownerId, childId: requiredId("childId"), teacherId: numericId("teacherId"), subject: text("subject") || "درس", lessonDate: date("date") || new Date(), durationMinutes: 60, cost: Math.max(0, Number(p.cost) || 0), status: text("status") === "completed" ? "completed" : "scheduled", notes: text("notes") }).returning({ id: lessons.id });
+      return { entity: input.entity, id: Number(result[0]?.id), success: true } as const;
     }
     if (input.entity === "vehicles") {
-      const result = await db.insert(personalVehicles).values({ ownerId, vehicleType: (text("type") as "car" | "motorcycle" | "tuk_tuk" | "other") || "other", customType: text("customType"), make: text("make"), model: text("model"), color: text("color"), plateNumber: text("plate"), vin: text("vin"), purchaseDate: date("purchaseDate"), saleDate: date("saleDate"), ownership: (text("ownership") as "owned" | "sold" | "leased") || "owned", licenseStatus: (text("licenseStatus") as "valid" | "expired" | "withdrawn" | "unlicensed") || "unlicensed", licenseNumber: text("licenseNumber"), licenseExpiry: date("licenseExpiry"), licenseWithdrawnDate: date("licenseWithdrawnDate"), licenseWithdrawalReason: text("licenseWithdrawalReason"), notes: text("notes") });
-      return { entity: input.entity, id: Number(result[0].insertId), success: true } as const;
+      const result = await db.insert(personalVehicles).values({ ownerId, vehicleType: (text("type") as "car" | "motorcycle" | "tuk_tuk" | "other") || "other", customType: text("customType"), make: text("make"), model: text("model"), color: text("color"), plateNumber: text("plate"), vin: text("vin"), purchaseDate: date("purchaseDate"), saleDate: date("saleDate"), ownership: (text("ownership") as "owned" | "sold" | "leased") || "owned", licenseStatus: (text("licenseStatus") as "valid" | "expired" | "withdrawn" | "unlicensed") || "unlicensed", licenseNumber: text("licenseNumber"), licenseExpiry: date("licenseExpiry"), licenseWithdrawnDate: date("licenseWithdrawnDate"), licenseWithdrawalReason: text("licenseWithdrawalReason"), notes: text("notes") }).returning({ id: personalVehicles.id });
+      return { entity: input.entity, id: Number(result[0]?.id), success: true } as const;
     }
     if (input.entity === "vehicleVisits") {
-      const result = await db.insert(personalVehicleVisits).values({ ownerId, vehicleId: Number(p.vehicleId), visitDate: date("date") || new Date(), visitType: (text("kind") as "inspection" | "renewal" | "license" | "withdrawal" | "other") || "other", result: text("result"), nextDueDate: date("nextDue"), fees: Math.max(0, Number(p.fees) || 0), notes: text("notes") });
-      return { entity: input.entity, id: Number(result[0].insertId), success: true } as const;
+      const result = await db.insert(personalVehicleVisits).values({ ownerId, vehicleId: requiredId("vehicleId"), visitDate: date("date") || new Date(), visitType: (text("kind") as "inspection" | "renewal" | "license" | "withdrawal" | "other") || "other", result: text("result"), nextDueDate: date("nextDue"), fees: Math.max(0, Number(p.fees) || 0), notes: text("notes") }).returning({ id: personalVehicleVisits.id });
+      return { entity: input.entity, id: Number(result[0]?.id), success: true } as const;
     }
     throw new TRPCError({ code: "BAD_REQUEST", message: "نوع السجل غير مدعوم." });
   }),
@@ -163,8 +167,8 @@ export const smartSecurityRouter = router({
     create: protectedProcedure.input(staffInput).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
       const ownerId = ownerIdFrom(ctx.user);
-      const result = await db.insert(securityStaff).values({ ...input, ownerId });
-      const created = await db.select().from(securityStaff).where(and(eq(securityStaff.ownerId, ownerId), eq(securityStaff.id, Number(result[0].insertId)))).limit(1);
+      const result = await db.insert(securityStaff).values({ ...input, ownerId }).returning({ id: securityStaff.id });
+      const created = await db.select().from(securityStaff).where(and(eq(securityStaff.ownerId, ownerId), eq(securityStaff.id, Number(result[0]?.id)))).limit(1);
       return created[0];
     }),
     updateStatus: protectedProcedure.input(z.object({ id: z.number().int().positive(), isActive: z.boolean() })).mutation(async ({ ctx, input }) => {
@@ -184,8 +188,8 @@ export const smartSecurityRouter = router({
     }),
     create: protectedProcedure.input(z.object({ staffId: z.number().int().positive(), attendanceDate: dateValue, shift: z.enum(["morning", "evening", "night", "off", "leave"]), status: z.enum(["present", "absent", "excused"]), hours: z.number().int().min(0).max(24).default(8), notes: optionalText })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
-      const result = await db.insert(securityAttendance).values({ ...input, ownerId: ctx.user.id });
-      return { id: Number(result[0].insertId), success: true } as const;
+      const result = await db.insert(securityAttendance).values({ ...input, ownerId: ctx.user.id }).returning({ id: securityAttendance.id });
+      return { id: Number(result[0]?.id), success: true } as const;
     }),
   }),
   patrols: router({
@@ -200,8 +204,8 @@ export const smartSecurityRouter = router({
     }),
     create: protectedProcedure.input(z.object({ staffId: z.number().int().positive().optional().nullable(), branch: z.string().trim().min(1).max(120), patrolDate: dateValue, checkpoint: z.string().trim().max(160).optional().nullable(), notes: optionalText, photoUrl: z.string().url().max(512).optional().nullable() })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
-      const result = await db.insert(securityPatrols).values({ ...input, ownerId: ctx.user.id });
-      return { id: Number(result[0].insertId), success: true } as const;
+      const result = await db.insert(securityPatrols).values({ ...input, ownerId: ctx.user.id }).returning({ id: securityPatrols.id });
+      return { id: Number(result[0]?.id), success: true } as const;
     }),
   }),
   patrolPlans: router({
@@ -213,8 +217,8 @@ export const smartSecurityRouter = router({
     }),
     create: protectedProcedure.input(z.object({ staffId: z.number().int().positive().optional().nullable(), branch: z.string().trim().min(1).max(120), checkpoint: z.string().trim().min(1).max(160), planDate: dateValue, shift: z.enum(["morning", "evening", "night", "off"]), repeatWeekly: z.boolean().default(false), notes: optionalText })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
-      const result = await db.insert(securityPatrolPlans).values({ ...input, ownerId: ctx.user.id });
-      return { id: Number(result[0].insertId), success: true } as const;
+      const result = await db.insert(securityPatrolPlans).values({ ...input, ownerId: ctx.user.id }).returning({ id: securityPatrolPlans.id });
+      return { id: Number(result[0]?.id), success: true } as const;
     }),
   }),
   workLocations: router({
@@ -224,8 +228,8 @@ export const smartSecurityRouter = router({
     }),
     create: protectedProcedure.input(z.object({ staffId: z.number().int().positive(), locationName: z.string().trim().min(1).max(160), fromDate: dateValue, toDate: dateValue.optional().nullable(), transferReason: z.string().trim().max(255).optional().nullable(), notes: optionalText })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
-      const result = await db.insert(securityWorkLocations).values({ ...input, ownerId: ctx.user.id });
-      return { id: Number(result[0].insertId), success: true } as const;
+      const result = await db.insert(securityWorkLocations).values({ ...input, ownerId: ctx.user.id }).returning({ id: securityWorkLocations.id });
+      return { id: Number(result[0]?.id), success: true } as const;
     }),
   }),
   finance: router({
@@ -239,8 +243,8 @@ export const smartSecurityRouter = router({
     }),
     create: protectedProcedure.input(z.object({ entryType: z.enum(["income", "expense"]), category: z.string().trim().min(1).max(100), amount: z.number().int().positive(), entryDate: dateValue, description: optionalText })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
-      const result = await db.insert(financeEntries).values({ ...input, ownerId: ctx.user.id });
-      return { id: Number(result[0].insertId), success: true } as const;
+      const result = await db.insert(financeEntries).values({ ...input, ownerId: ctx.user.id }).returning({ id: financeEntries.id });
+      return { id: Number(result[0]?.id), success: true } as const;
     }),
   }),
   debts: router({
@@ -251,8 +255,8 @@ export const smartSecurityRouter = router({
     create: protectedProcedure.input(z.object({ personName: z.string().trim().min(2).max(160), direction: z.enum(["receivable", "payable"]), totalAmount: z.number().int().positive(), paidAmount: z.number().int().nonnegative().default(0), dueDate: dateValue.optional().nullable(), notes: optionalText })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
       const status = input.paidAmount >= input.totalAmount ? "settled" : input.paidAmount > 0 ? "partial" : "open";
-      const result = await db.insert(debts).values({ ...input, ownerId: ctx.user.id, status });
-      return { id: Number(result[0].insertId), success: true } as const;
+      const result = await db.insert(debts).values({ ...input, ownerId: ctx.user.id, status }).returning({ id: debts.id });
+      return { id: Number(result[0]?.id), success: true } as const;
     }),
     recordPayment: protectedProcedure.input(z.object({ id: z.number().int().positive(), paidAmount: z.number().int().nonnegative() })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
@@ -270,8 +274,8 @@ export const smartSecurityRouter = router({
     }),
     create: protectedProcedure.input(z.object({ fullName: z.string().trim().min(2).max(160), grade: z.string().trim().max(80).optional().nullable(), school: z.string().trim().max(160).optional().nullable(), phone: z.string().trim().max(32).optional().nullable(), notes: optionalText })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
-      const result = await db.insert(children).values({ ...input, ownerId: ctx.user.id });
-      return { id: Number(result[0].insertId), success: true } as const;
+      const result = await db.insert(children).values({ ...input, ownerId: ctx.user.id }).returning({ id: children.id });
+      return { id: Number(result[0]?.id), success: true } as const;
     }),
   }),
   teachers: router({
@@ -281,8 +285,8 @@ export const smartSecurityRouter = router({
     }),
     create: protectedProcedure.input(z.object({ fullName: z.string().trim().min(2).max(160), subject: z.string().trim().min(1).max(120), phone: z.string().trim().max(32).optional().nullable(), monthlyCost: z.number().int().nonnegative().default(0), notes: optionalText })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
-      const result = await db.insert(teachers).values({ ...input, ownerId: ctx.user.id });
-      return { id: Number(result[0].insertId), success: true } as const;
+      const result = await db.insert(teachers).values({ ...input, ownerId: ctx.user.id }).returning({ id: teachers.id });
+      return { id: Number(result[0]?.id), success: true } as const;
     }),
   }),
   lessons: router({
@@ -296,8 +300,8 @@ export const smartSecurityRouter = router({
     }),
     create: protectedProcedure.input(z.object({ childId: z.number().int().positive(), teacherId: z.number().int().positive().optional().nullable(), subject: z.string().trim().min(1).max(120), lessonDate: dateValue, durationMinutes: z.number().int().positive().max(600).default(60), cost: z.number().int().nonnegative().default(0), status: z.enum(["scheduled", "completed", "cancelled"]).default("scheduled"), notes: optionalText })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
-      const result = await db.insert(lessons).values({ ...input, ownerId: ctx.user.id });
-      return { id: Number(result[0].insertId), success: true } as const;
+      const result = await db.insert(lessons).values({ ...input, ownerId: ctx.user.id }).returning({ id: lessons.id });
+      return { id: Number(result[0]?.id), success: true } as const;
     }),
   }),
   vehicles: router({
@@ -307,8 +311,8 @@ export const smartSecurityRouter = router({
     }),
     create: protectedProcedure.input(z.object({ vehicleType: z.enum(["car", "motorcycle", "tuk_tuk", "other"]), customType: z.string().trim().max(100).optional().nullable(), make: z.string().trim().max(100).optional().nullable(), model: z.string().trim().max(100).optional().nullable(), color: z.string().trim().max(60).optional().nullable(), plateNumber: z.string().trim().max(64).optional().nullable(), vin: z.string().trim().max(100).optional().nullable(), purchaseDate: dateValue.optional().nullable(), saleDate: dateValue.optional().nullable(), ownership: z.enum(["owned", "sold", "leased"]).default("owned"), licenseStatus: z.enum(["valid", "expired", "withdrawn", "unlicensed"]).default("unlicensed"), licenseNumber: z.string().trim().max(80).optional().nullable(), licenseExpiry: dateValue.optional().nullable(), licenseWithdrawnDate: dateValue.optional().nullable(), licenseWithdrawalReason: optionalText, notes: optionalText })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
-      const result = await db.insert(personalVehicles).values({ ...input, ownerId: ctx.user.id });
-      return { id: Number(result[0].insertId), success: true } as const;
+      const result = await db.insert(personalVehicles).values({ ...input, ownerId: ctx.user.id }).returning({ id: personalVehicles.id });
+      return { id: Number(result[0]?.id), success: true } as const;
     }),
   }),
   vehicleVisits: router({
@@ -320,8 +324,8 @@ export const smartSecurityRouter = router({
     }),
     create: protectedProcedure.input(z.object({ vehicleId: z.number().int().positive(), visitDate: dateValue, visitType: z.enum(["inspection", "renewal", "license", "withdrawal", "other"]), result: z.string().trim().max(255).optional().nullable(), nextDueDate: dateValue.optional().nullable(), fees: z.number().int().nonnegative().default(0), notes: optionalText })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
-      const result = await db.insert(personalVehicleVisits).values({ ...input, ownerId: ctx.user.id });
-      return { id: Number(result[0].insertId), success: true } as const;
+      const result = await db.insert(personalVehicleVisits).values({ ...input, ownerId: ctx.user.id }).returning({ id: personalVehicleVisits.id });
+      return { id: Number(result[0]?.id), success: true } as const;
     }),
   }),
 });

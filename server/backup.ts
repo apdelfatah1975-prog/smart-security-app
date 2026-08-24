@@ -107,8 +107,7 @@ export async function createOwnerBackup(ownerId: number, options?: { tables?: Ba
   if (typeof (db as { insert?: unknown }).insert !== "function") return null;
   const uploaded = await storagePut(`water-filter-backups/${ownerId}/latest.xlsx`, buffer, XLSX_CONTENT_TYPE);
   const settingsInsert = db.insert(notificationSettings).values({ ownerId, backupFileKey: uploaded.key, backupGeneratedAt: generatedAt });
-  if (typeof (settingsInsert as { onDuplicateKeyUpdate?: unknown }).onDuplicateKeyUpdate !== "function") return null;
-  await settingsInsert.onDuplicateKeyUpdate({ set: { backupFileKey: uploaded.key, backupGeneratedAt: generatedAt } });
+  await db.insert(notificationSettings).values({ ownerId, backupFileKey: uploaded.key, backupGeneratedAt: generatedAt }).onConflictDoUpdate({ target: notificationSettings.ownerId, set: { backupFileKey: uploaded.key, backupGeneratedAt: generatedAt } });
   await db.insert(exportHistory).values({ ownerId, exportedBy: options?.exportedBy ?? ownerId, selectedTables: JSON.stringify(tables), counts: JSON.stringify(counts), fileKey: uploaded.key, generatedAt });
   return { key: uploaded.key, url: uploaded.url, generatedAt, tables, counts };
 }

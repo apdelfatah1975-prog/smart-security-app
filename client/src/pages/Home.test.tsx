@@ -13,6 +13,11 @@ vi.mock("sonner", () => ({
 }));
 vi.mock("@/lib/trpc", () => ({
   trpc: {
+    useUtils: () => ({ auth: { me: { setData: vi.fn(), invalidate: vi.fn(async () => undefined) } } }),
+    auth: {
+      me: { useQuery: () => ({ data: null, isLoading: false, isError: false, error: null, refetch: vi.fn() }) },
+      logout: { useMutation: () => ({ mutateAsync: vi.fn(async () => undefined), isPending: false, error: null }) },
+    },
     smartSecurity: {
       snapshot: { useQuery: () => ({ data: undefined, isLoading: false, isError: false, refetch: vi.fn() }) },
       save: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },

@@ -563,7 +563,7 @@ export const filterManagementRouter = router({
     updateMenuPermissions: adminProcedure.input(z.object({ id: z.number().int().positive(), menuPermissions: z.array(z.enum(["workOrders", "pendingOperations", "customers", "visits"])).min(1).max(4) })).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
       const updated = await db.update(allowedTechnicianAccounts).set({ menuPermissions: JSON.stringify(Array.from(new Set(input.menuPermissions))) }).where(and(eq(allowedTechnicianAccounts.id, input.id), eq(allowedTechnicianAccounts.ownerId, ctx.user.id)));
-      if (!updated[0]?.affectedRows) throw new TRPCError({ code: "NOT_FOUND", message: "الحساب غير موجود." });
+      if (!updated.length) throw new TRPCError({ code: "NOT_FOUND", message: "الحساب غير موجود." });
       return { success: true };
     }),
     create: adminProcedure.input(z.object({
@@ -578,8 +578,8 @@ export const filterManagementRouter = router({
       const matchedUser = await db.select({ id: users.id, role: users.role }).from(users).where(eq(users.email, email)).limit(1);
       if (matchedUser[0]?.role === "admin") throw new TRPCError({ code: "CONFLICT", message: "لا يمكن اعتماد حساب إداري كحساب فني." });
       const passwordHash = await hashPin(input.password);
-      const inserted = await db.insert(allowedTechnicianAccounts).values({ ownerId: ctx.user.id, email, displayName: input.displayName.trim(), linkedUserId: matchedUser[0]?.id ?? null, passwordHash, isActive: true });
-      const accountId = Number(inserted[0].insertId);
+      const inserted = await db.insert(allowedTechnicianAccounts).values({ ownerId: ctx.user.id, email, displayName: input.displayName.trim(), linkedUserId: matchedUser[0]?.id ?? null, passwordHash, isActive: true }).returning({ id: allowedTechnicianAccounts.id });
+      const accountId = Number(inserted[0]?.id);
       if (!matchedUser[0]) {
         const openId = `local-technician-${ctx.user.id}-${accountId}`;
         await upsertUser({ openId, name: input.displayName.trim(), email, loginMethod: "technician-password", role: "user", lastSignedIn: new Date() });
@@ -592,13 +592,13 @@ export const filterManagementRouter = router({
       const db = await databaseOrThrow();
       const passwordHash = await hashPin(input.password);
       const updated = await db.update(allowedTechnicianAccounts).set({ passwordHash }).where(and(eq(allowedTechnicianAccounts.id, input.id), eq(allowedTechnicianAccounts.ownerId, ctx.user.id)));
-      if (!updated[0]?.affectedRows) throw new TRPCError({ code: "NOT_FOUND", message: "الحساب غير موجود." });
+      if (!updated.length) throw new TRPCError({ code: "NOT_FOUND", message: "الحساب غير موجود." });
       return { success: true };
     }),
     setActive: adminProcedure.input(z.object({ id: z.number().int().positive(), isActive: z.boolean() })).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
       const updated = await db.update(allowedTechnicianAccounts).set({ isActive: input.isActive }).where(and(eq(allowedTechnicianAccounts.id, input.id), eq(allowedTechnicianAccounts.ownerId, ctx.user.id)));
-      if (!updated[0]?.affectedRows) throw new TRPCError({ code: "NOT_FOUND", message: "الحساب غير موجود." });
+      if (!updated.length) throw new TRPCError({ code: "NOT_FOUND", message: "الحساب غير موجود." });
       return { success: true };
     }),
   }),
@@ -876,15 +876,15 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
         const duplicate = await db.select({ id: customers.id }).from(customers).where(and(eq(customers.ownerId, ownerId), eq(customers.manualCode, data.manualCode))).limit(1);
         if (duplicate[0]) throw new TRPCError({ code: "CONFLICT", message: "كود العميل مستخدم بالفعل، اختر كودًا مختلفًا." });
       }
-      const result = await db.insert(customers).values({ ...data, clientOperationId, ownerId });
-      const customerId = Number(result[0].insertId);
+      const result = await db.insert(customers).values({ ...data, clientOperationId, ownerId }).returning({ id: customers.id });
+      const customerId = Number(result[0]?.id);
       if (!firstVisitType) {
         await refreshOwnerBackup(ownerId);
         return { id: customerId, alreadySynced: false, firstVisitCreated: false };
       }
       const visitDate = firstVisitDate ?? new Date();
-      const visitResult = await db.insert(visits).values({ customerId, ownerId, visitType: firstVisitType, visitDate, technicianName: storedTechnicianName, assignedTechnicianId: assignedTechnician?.id ?? null, salesAgentName: firstSalesAgentName ?? null, filterCount: firstFilterCount, tdsIn: firstTdsIn ?? null, tdsOut: firstTdsOut ?? null, visitResult: firstVisitResult ?? null, notes: firstVisitNotes ?? null });
-      const visitId = Number(visitResult[0].insertId);
+      const visitResult = await db.insert(visits).values({ customerId, ownerId, visitType: firstVisitType, visitDate, technicianName: storedTechnicianName, assignedTechnicianId: assignedTechnician?.id ?? null, salesAgentName: firstSalesAgentName ?? null, filterCount: firstFilterCount, tdsIn: firstTdsIn ?? null, tdsOut: firstTdsOut ?? null, visitResult: firstVisitResult ?? null, notes: firstVisitNotes ?? null }).returning({ id: visits.id });
+      const visitId = Number(visitResult[0]?.id);
       const inventoryRows = items.length ? await db.select().from(inventoryItems).where(and(eq(inventoryItems.ownerId, ownerId), inArray(inventoryItems.id, items.map(item => item.inventoryItemId)))) : [];
       const inventoryById = new Map(inventoryRows.map(item => [item.id, item]));
       for (const requested of items) {
@@ -897,15 +897,15 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
       for (const requested of items) {
         const inventoryItem = inventoryById.get(requested.inventoryItemId)!;
         const operationId = clientOperationId ? `${clientOperationId}:${requested.inventoryItemId}`.slice(0, 64) : undefined;
-        await db.insert(visitItems).values({ ownerId, visitId, inventoryItemId: inventoryItem.id, itemNameSnapshot: inventoryItem.name, unitSnapshot: inventoryItem.unit, quantity: requested.quantity, source: requested.source, clientOperationId: operationId });
-        await db.insert(inventoryMovements).values({ ownerId, inventoryItemId: inventoryItem.id, movementType: "outgoing", quantity: requested.quantity, unitCost: inventoryItem.defaultUnitCost, currency: "SAR", movementDate: visitDate, technicianName: storedTechnicianName, notes: `منصرف تلقائي من أول زيارة للعميل ${input.name}`, clientOperationId: operationId });
+        await db.insert(visitItems).values({ ownerId, visitId, inventoryItemId: inventoryItem.id, itemNameSnapshot: inventoryItem.name, unitSnapshot: inventoryItem.unit, quantity: requested.quantity, source: requested.source, clientOperationId: operationId }).returning({ id: visitItems.id });
+        await db.insert(inventoryMovements).values({ ownerId, inventoryItemId: inventoryItem.id, movementType: "outgoing", quantity: requested.quantity, unitCost: inventoryItem.defaultUnitCost, currency: "SAR", movementDate: visitDate, technicianName: storedTechnicianName, notes: `منصرف تلقائي من أول زيارة للعميل ${input.name}`, clientOperationId: operationId }).returning({ id: inventoryMovements.id });
       }
       if (needsAutomaticReminder(firstVisitType)) {
-        await db.insert(reminders).values({ customerId, visitId, ownerId, reminderDate: followUpDate(visitDate) });
+        await db.insert(reminders).values({ customerId, visitId, ownerId, reminderDate: followUpDate(visitDate) }).returning({ id: reminders.id });
       }
       if (firstCollectedAmount > 0) {
         const category = firstVisitType === "installation" ? "تحصيل تركيب" : firstVisitType === "maintenance" ? "تحصيل صيانة" : firstVisitType === "cartridge_change" ? "تحصيل تغيير شمعات" : "تحصيل زيارة";
-        await db.insert(cashTransactions).values({ ownerId, transactionType: "income", currency: firstCollectedCurrency, amount: firstCollectedAmount, category, transactionDate: visitDate, sourceVisitId: visitId, recipientName: storedTechnicianName, notes: storedTechnicianName ? `العميل: ${input.name} | إيراد أُنشئ تلقائيًا من أول زيارة بواسطة ${storedTechnicianName}` : `العميل: ${input.name} | إيراد أُنشئ تلقائيًا من أول زيارة` });
+        await db.insert(cashTransactions).values({ ownerId, transactionType: "income", currency: firstCollectedCurrency, amount: firstCollectedAmount, category, transactionDate: visitDate, sourceVisitId: visitId, recipientName: storedTechnicianName, notes: storedTechnicianName ? `العميل: ${input.name} | إيراد أُنشئ تلقائيًا من أول زيارة بواسطة ${storedTechnicianName}` : `العميل: ${input.name} | إيراد أُنشئ تلقائيًا من أول زيارة` }).returning({ id: cashTransactions.id });
       }
       await refreshOwnerBackup(ownerId);
       return { id: customerId, alreadySynced: false, firstVisitCreated: true, reminderCreated: needsAutomaticReminder(firstVisitType) };
@@ -947,7 +947,8 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
         if (row.visitType && !row.visitDate) { rejected.push({ rowNumber: row.rowNumber, reason: "لا يمكن إنشاء الزيارة دون تاريخ" }); continue; }
         const location = row.location?.trim() || "";
         const coordinates = location.match(/(-?\\d+(?:\\.\\d+)?)\\s*[,،]\\s*(-?\\d+(?:\\.\\d+)?)/);
-        const customerId = linkedCustomerId || Number((await db.insert(customers).values({ ownerId, name, phone, manualCode, address: row.address?.trim() || null, latitude: coordinates?.[1] || null, longitude: coordinates?.[2] || null, notes: row.notes?.trim() || null }))[0].insertId);
+        const customerInsert = linkedCustomerId ? [] : await db.insert(customers).values({ ownerId, name, phone, manualCode, address: row.address?.trim() || null, latitude: coordinates?.[1] || null, longitude: coordinates?.[2] || null, notes: row.notes?.trim() || null }).returning({ id: customers.id });
+        const customerId = linkedCustomerId || Number(customerInsert[0]?.id);
         if (linkedCustomerId) linked += 1;
         if (!linkedCustomerId) {
           added += 1;
@@ -961,7 +962,8 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
           let visitWasCreated = false;
           if (!visitId) {
             try {
-              visitId = Number((await db.insert(visits).values({ ownerId, customerId, visitType: row.visitType, visitDate: row.visitDate, technicianName: assignedTechnician?.name || row.technicianName?.trim() || null, assignedTechnicianId: assignedTechnician?.id || null, status: "completed", notes: row.notes?.trim() || null, clientOperationId: operationId }))[0].insertId);
+              const visitInsert = await db.insert(visits).values({ ownerId, customerId, visitType: row.visitType, visitDate: row.visitDate, technicianName: assignedTechnician?.name || row.technicianName?.trim() || null, assignedTechnicianId: assignedTechnician?.id || null, status: "completed", notes: row.notes?.trim() || null, clientOperationId: operationId }).returning({ id: visits.id });
+              visitId = Number(visitInsert[0]?.id);
               visitWasCreated = true;
             } catch (error) {
               const concurrentVisit = await db.select({ id: visits.id }).from(visits).where(and(eq(visits.ownerId, ownerId), eq(visits.clientOperationId, operationId))).limit(1);
@@ -971,7 +973,7 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
           }
           if (visitWasCreated) {
             visitsAdded += 1;
-            if (needsAutomaticReminder(row.visitType)) await db.insert(reminders).values({ customerId, visitId, ownerId, reminderDate: followUpDate(row.visitDate) });
+            if (needsAutomaticReminder(row.visitType)) await db.insert(reminders).values({ customerId, visitId, ownerId, reminderDate: followUpDate(row.visitDate) }).returning({ id: reminders.id });
           }
           const amount = Math.round(row.collectedAmount || 0);
           const incomeOperationId = `${operationId}:income`.slice(0, 64);
@@ -979,7 +981,7 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
             const existingIncome = await db.select({ id: cashTransactions.id }).from(cashTransactions).where(and(eq(cashTransactions.ownerId, ownerId), eq(cashTransactions.clientOperationId, incomeOperationId))).limit(1);
             if (!existingIncome[0]) {
               const category = row.visitType === "installation" ? "تحصيل تركيب" : row.visitType === "maintenance" ? "تحصيل صيانة" : row.visitType === "cartridge_change" ? "تحصيل تغيير شمعات" : "تحصيل زيارة";
-              await db.insert(cashTransactions).values({ ownerId, transactionType: "income", currency: "SAR", amount, category, transactionDate: row.visitDate, sourceVisitId: visitId, recipientName: assignedTechnician?.name ?? row.technicianName?.trim() ?? null, clientOperationId: incomeOperationId, notes: `العميل: ${name} | إيراد مستورد من Excel` });
+              await db.insert(cashTransactions).values({ ownerId, transactionType: "income", currency: "SAR", amount, category, transactionDate: row.visitDate, sourceVisitId: visitId, recipientName: assignedTechnician?.name ?? row.technicianName?.trim() ?? null, clientOperationId: incomeOperationId, notes: `العميل: ${name} | إيراد مستورد من Excel` }).returning({ id: cashTransactions.id });
               incomeAdded += 1;
             }
           }
@@ -999,14 +1001,14 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
         const longitude = (46.63 + (index % 40) * 0.002).toFixed(6);
         return { ownerId: ctx.user.id, name: `عميل تجريبي للأداء ${sequence}`, phone: `099${String(index + 1).padStart(7, "0")}`, manualCode: `PERF-${sequence}`, address: `عنوان تجريبي ${sequence}`, latitude, longitude, notes: marker };
       });
-      for (let offset = 0; offset < rows.length; offset += 250) await db.insert(customers).values(rows.slice(offset, offset + 250));
+      for (let offset = 0; offset < rows.length; offset += 250) await db.insert(customers).values(rows.slice(offset, offset + 250)).returning({ id: customers.id });
       const seededCustomers = await db.select({ id: customers.id, manualCode: customers.manualCode }).from(customers).where(and(eq(customers.ownerId, ctx.user.id), eq(customers.notes, marker)));
       const visitRows = seededCustomers.map((customer, index) => {
         const sequence = String(index + 1).padStart(4, "0");
         const visitDate = new Date(Date.now() - (index % 365) * 86_400_000);
         return { customerId: customer.id, ownerId: ctx.user.id, visitType: index % 3 === 0 ? "installation" as const : index % 3 === 1 ? "maintenance" as const : "cartridge_change" as const, visitDate, technicianName: index % 2 === 0 ? "فني تجريبي" : "فني اختبار", status: "completed" as const, completedAt: visitDate, notes: marker, visitResult: "تم التنفيذ - بيانات اختبار أداء", clientOperationId: `${marker}:visit:${sequence}` };
       });
-      for (let offset = 0; offset < visitRows.length; offset += 250) await db.insert(visits).values(visitRows.slice(offset, offset + 250));
+      for (let offset = 0; offset < visitRows.length; offset += 250) await db.insert(visits).values(visitRows.slice(offset, offset + 250)).returning({ id: visits.id });
       const seededVisits = await db.select({ id: visits.id, customerId: visits.customerId, visitDate: visits.visitDate }).from(visits).where(and(eq(visits.ownerId, ctx.user.id), like(visits.clientOperationId, `${marker}:visit:%`)));
       const visitByCustomer = new Map(seededVisits.map(visit => [visit.customerId, visit]));
       const cashRows = seededCustomers.flatMap((customer, index) => {
@@ -1016,7 +1018,7 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
         const amount = 150 + (index % 8) * 50;
         return [{ ownerId: ctx.user.id, transactionType: "income" as const, currency: "SAR" as const, amount, category: "تحصيل اختبار أداء", transactionDate: visit.visitDate, sourceVisitId: visit.id, recipientName: "فني تجريبي", clientOperationId: `${marker}:cash:${sequence}`, notes: marker }];
       });
-      for (let offset = 0; offset < cashRows.length; offset += 250) await db.insert(cashTransactions).values(cashRows.slice(offset, offset + 250));
+      for (let offset = 0; offset < cashRows.length; offset += 250) await db.insert(cashTransactions).values(cashRows.slice(offset, offset + 250)).returning({ id: cashTransactions.id });
       void refreshOwnerBackup(ctx.user.id).catch(error => console.error("[PerformanceSeed] backup refresh failed", error));
       return { created: seededCustomers.length, visitsCreated: visitRows.length, cashCreated: cashRows.length, existing: 0, marker };
     }),
@@ -1055,7 +1057,7 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
             await db.update(cashTransactions).set({ amount: collectedAmount }).where(and(eq(cashTransactions.id, linkedIncome[0].id), eq(cashTransactions.ownerId, ctx.user.id)));
           } else if (collectedAmount > 0) {
             const category = latestForAmount[0].visitType === "installation" ? "تحصيل تركيب" : latestForAmount[0].visitType === "maintenance" ? "تحصيل صيانة" : latestForAmount[0].visitType === "cartridge_change" ? "تحصيل تغيير شمعات" : "تحصيل زيارة";
-            await db.insert(cashTransactions).values({ ownerId: ctx.user.id, transactionType: "income", currency: "SAR", amount: collectedAmount, category, transactionDate: latestForAmount[0].visitDate, sourceVisitId: latestForAmount[0].id, recipientName: latestForAmount[0].technicianName ?? null, notes: latestForAmount[0].technicianName ? `العميل: ${customer.name} | إيراد أُنشئ من تعديل مبلغ الخدمة بواسطة ${latestForAmount[0].technicianName}` : `العميل: ${customer.name} | إيراد أُنشئ من تعديل مبلغ الخدمة` });
+            await db.insert(cashTransactions).values({ ownerId: ctx.user.id, transactionType: "income", currency: "SAR", amount: collectedAmount, category, transactionDate: latestForAmount[0].visitDate, sourceVisitId: latestForAmount[0].id, recipientName: latestForAmount[0].technicianName ?? null, notes: latestForAmount[0].technicianName ? `العميل: ${customer.name} | إيراد أُنشئ من تعديل مبلغ الخدمة بواسطة ${latestForAmount[0].technicianName}` : `العميل: ${customer.name} | إيراد أُنشئ من تعديل مبلغ الخدمة` }).returning({ id: cashTransactions.id });
           }
         }
       }
@@ -1134,7 +1136,7 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
       const db = await databaseOrThrow();
       const existing = await db.select().from(serviceTypes).where(eq(serviceTypes.ownerId, ctx.user.id));
       if (!existing.length) {
-        await db.insert(serviceTypes).values(visitTypes.map(code => ({ ownerId: ctx.user.id, code, name: code === "installation" ? "تركيب فلتر" : code === "maintenance" ? "صيانة" : code === "cartridge_change" ? "تغيير شمعات" : code === "follow_up" ? "متابعة" : "أخرى" })));
+        await db.insert(serviceTypes).values(visitTypes.map(code => ({ ownerId: ctx.user.id, code, name: code === "installation" ? "تركيب فلتر" : code === "maintenance" ? "صيانة" : code === "cartridge_change" ? "تغيير شمعات" : code === "follow_up" ? "متابعة" : "أخرى" }))).returning({ id: serviceTypes.id });
       }
       const types = existing.length ? existing : await db.select().from(serviceTypes).where(eq(serviceTypes.ownerId, ctx.user.id));
       const mappings = types.length ? await db.select().from(serviceTypeItems).where(and(eq(serviceTypeItems.ownerId, ctx.user.id), inArray(serviceTypeItems.serviceTypeId, types.map(type => type.id)))) : [];
@@ -1146,7 +1148,7 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
       const service = await db.select({ id: serviceTypes.id }).from(serviceTypes).where(and(eq(serviceTypes.id, input.serviceTypeId), eq(serviceTypes.ownerId, ctx.user.id))).limit(1);
       const item = await db.select({ id: inventoryItems.id }).from(inventoryItems).where(and(eq(inventoryItems.id, input.inventoryItemId), eq(inventoryItems.ownerId, ctx.user.id))).limit(1);
       if (!service[0] || !item[0]) throw new TRPCError({ code: "NOT_FOUND", message: "الخدمة أو الصنف غير موجود." });
-      await db.insert(serviceTypeItems).values({ ownerId: ctx.user.id, ...input }).onDuplicateKeyUpdate({ set: { defaultQuantity: input.defaultQuantity, isRequired: input.isRequired, allowEditQuantity: input.allowEditQuantity } });
+      await db.insert(serviceTypeItems).values({ ownerId: ctx.user.id, ...input }).onConflictDoUpdate({ target: [serviceTypeItems.ownerId, serviceTypeItems.serviceTypeId, serviceTypeItems.inventoryItemId], set: { defaultQuantity: input.defaultQuantity, isRequired: input.isRequired, allowEditQuantity: input.allowEditQuantity } }).returning({ id: serviceTypeItems.id });
       await db.update(serviceTypes).set({ version: 1 }).where(eq(serviceTypes.id, input.serviceTypeId));
       await refreshOwnerBackup(ctx.user.id);
       return { success: true };
@@ -1204,13 +1206,13 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
         const balance = calculateStockBalance(inventoryItem.openingQuantity, movements);
         if (requested.quantity > balance) throw new TRPCError({ code: "BAD_REQUEST", message: `الرصيد غير كافٍ من صنف ${inventoryItem.name}؛ المتاح ${balance} والمطلوب ${requested.quantity}.` });
       }
-      const visitResult = await db.insert(visits).values({ ...visitData, ownerId, technicianName: storedTechnicianName, assignedTechnicianId: assignedTechnician?.id ?? null, clientOperationId });
-      const visitId = Number(visitResult[0].insertId);
+      const visitResult = await db.insert(visits).values({ ...visitData, ownerId, technicianName: storedTechnicianName, assignedTechnicianId: assignedTechnician?.id ?? null, clientOperationId }).returning({ id: visits.id });
+      const visitId = Number(visitResult[0]?.id);
       for (const requested of items) {
         const inventoryItem = inventoryById.get(requested.inventoryItemId)!;
         const operationId = clientOperationId ? `${clientOperationId}:${requested.inventoryItemId}`.slice(0, 64) : undefined;
-        await db.insert(visitItems).values({ ownerId, visitId, inventoryItemId: inventoryItem.id, itemNameSnapshot: inventoryItem.name, unitSnapshot: inventoryItem.unit, quantity: requested.quantity, source: requested.source, clientOperationId: operationId });
-        await db.insert(inventoryMovements).values({ ownerId, inventoryItemId: inventoryItem.id, movementType: "outgoing", quantity: requested.quantity, unitCost: inventoryItem.defaultUnitCost, currency: "SAR", movementDate: input.visitDate, technicianName: storedTechnicianName, notes: `منصرف تلقائي من زيارة العميل ${customer.name}`, clientOperationId: operationId });
+        await db.insert(visitItems).values({ ownerId, visitId, inventoryItemId: inventoryItem.id, itemNameSnapshot: inventoryItem.name, unitSnapshot: inventoryItem.unit, quantity: requested.quantity, source: requested.source, clientOperationId: operationId }).returning({ id: visitItems.id });
+        await db.insert(inventoryMovements).values({ ownerId, inventoryItemId: inventoryItem.id, movementType: "outgoing", quantity: requested.quantity, unitCost: inventoryItem.defaultUnitCost, currency: "SAR", movementDate: input.visitDate, technicianName: storedTechnicianName, notes: `منصرف تلقائي من زيارة العميل ${customer.name}`, clientOperationId: operationId }).returning({ id: inventoryMovements.id });
       }
       // تسجيل الزيارة يعني أن متابعة العميل تمت؛ لا نُبقي أي تذكير سابق معلقًا.
       await db.update(reminders)
@@ -1226,13 +1228,13 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
           visitId,
           ownerId,
           reminderDate: input.nextVisitDate ?? followUpDate(input.visitDate),
-        });
+        }).returning({ id: reminders.id });
       }
       if (collectedAmount && collectedAmount > 0) {
         const existingIncome = await db.select().from(cashTransactions).where(and(eq(cashTransactions.ownerId, ownerId), eq(cashTransactions.sourceVisitId, visitId))).limit(1);
         if (!existingIncome[0]) {
           const category = input.visitType === "installation" ? "تحصيل تركيب" : input.visitType === "maintenance" ? "تحصيل صيانة" : input.visitType === "cartridge_change" ? "تحصيل تغيير شمعات" : "تحصيل زيارة";
-          await db.insert(cashTransactions).values({ ownerId, transactionType: "income", currency: collectedCurrency, amount: collectedAmount, category, transactionDate: input.visitDate, sourceVisitId: visitId, recipientName: storedTechnicianName, notes: storedTechnicianName ? `العميل: ${customer.name} | إيراد أُنشئ تلقائيًا من تسجيل الزيارة بواسطة ${storedTechnicianName}` : `العميل: ${customer.name} | إيراد أُنشئ تلقائيًا من تسجيل الزيارة` });
+          await db.insert(cashTransactions).values({ ownerId, transactionType: "income", currency: collectedCurrency, amount: collectedAmount, category, transactionDate: input.visitDate, sourceVisitId: visitId, recipientName: storedTechnicianName, notes: storedTechnicianName ? `العميل: ${customer.name} | إيراد أُنشئ تلقائيًا من تسجيل الزيارة بواسطة ${storedTechnicianName}` : `العميل: ${customer.name} | إيراد أُنشئ تلقائيًا من تسجيل الزيارة` }).returning({ id: cashTransactions.id });
         }
       }
       await refreshOwnerBackup(ownerId);
@@ -1279,14 +1281,14 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
       if (needsAutomaticReminder(input.visitType)) {
         const pending = await db.select().from(reminders).where(and(eq(reminders.visitId, input.id), eq(reminders.ownerId, ctx.user.id), eq(reminders.status, "pending"))).limit(1);
         if (pending[0]) await db.update(reminders).set({ reminderDate: input.nextVisitDate ?? followUpDate(input.visitDate) }).where(eq(reminders.id, pending[0].id));
-        else await db.insert(reminders).values({ customerId: existing[0].customerId, visitId: input.id, ownerId: ctx.user.id, reminderDate: input.nextVisitDate ?? followUpDate(input.visitDate) });
+        else await db.insert(reminders).values({ customerId: existing[0].customerId, visitId: input.id, ownerId: ctx.user.id, reminderDate: input.nextVisitDate ?? followUpDate(input.visitDate) }).returning({ id: reminders.id });
       }
 
       const income = await db.select().from(cashTransactions).where(and(eq(cashTransactions.ownerId, ctx.user.id), eq(cashTransactions.sourceVisitId, input.id))).limit(1);
       const category = input.visitType === "installation" ? "تحصيل تركيب" : input.visitType === "maintenance" ? "تحصيل صيانة" : input.visitType === "cartridge_change" ? "تحصيل تغيير شمعات" : "تحصيل زيارة";
       if (input.collectedAmount > 0) {
         if (income[0]) await db.update(cashTransactions).set({ amount: input.collectedAmount, currency: input.collectedCurrency, category, transactionDate: input.visitDate, recipientName: input.technicianName ?? null }).where(and(eq(cashTransactions.id, income[0].id), eq(cashTransactions.ownerId, ctx.user.id)));
-        else await db.insert(cashTransactions).values({ ownerId: ctx.user.id, transactionType: "income", currency: input.collectedCurrency, amount: input.collectedAmount, category, transactionDate: input.visitDate, sourceVisitId: input.id, recipientName: input.technicianName ?? null, notes: "إيراد مصحح من تسجيل زيارة" });
+        else await db.insert(cashTransactions).values({ ownerId: ctx.user.id, transactionType: "income", currency: input.collectedCurrency, amount: input.collectedAmount, category, transactionDate: input.visitDate, sourceVisitId: input.id, recipientName: input.technicianName ?? null, notes: "إيراد مصحح من تسجيل زيارة" }).returning({ id: cashTransactions.id });
       } else if (income[0]) {
         await db.delete(cashTransactions).where(and(eq(cashTransactions.id, income[0].id), eq(cashTransactions.ownerId, ctx.user.id)));
       }
@@ -1349,14 +1351,14 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
             visitDate: completedAt,
             technicianName: sourceVisit[0].technicianName ?? null,
             notes: "تم تسجيل الزيارة من قائمة المتابعة.",
-          });
-          const visitId = Number(visitResult[0].insertId);
+          }).returning({ id: visits.id });
+          const visitId = Number(visitResult[0]?.id);
           await db.insert(reminders).values({
             customerId: reminder[0].customerId,
             visitId,
             ownerId: ctx.user.id,
             reminderDate: followUpDate(completedAt),
-          });
+          }).returning({ id: reminders.id });
         }
       }
 
@@ -1388,7 +1390,7 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
       await requirePinIfConfigured(ctx.user.id, input.pin);
       const db = await databaseOrThrow();
       const { pin: _pin, ...settingsInput } = input;
-      await db.insert(notificationSettings).values({ ownerId: ctx.user.id, ...settingsInput }).onDuplicateKeyUpdate({ set: settingsInput });
+      await db.insert(notificationSettings).values({ ownerId: ctx.user.id, ...settingsInput }).onConflictDoUpdate({ target: notificationSettings.ownerId, set: settingsInput }).returning({ id: notificationSettings.id });
       await refreshOwnerBackup(ctx.user.id);
       return getNotificationSettings(ctx.user.id);
     }),
@@ -1400,7 +1402,7 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
       }
       const db = await databaseOrThrow();
       const pinHash = await hashPin(input.newPin);
-      await db.insert(notificationSettings).values({ ownerId: ctx.user.id, ...defaultNotificationSettings, pinHash }).onDuplicateKeyUpdate({ set: { pinHash } });
+      await db.insert(notificationSettings).values({ ownerId: ctx.user.id, ...defaultNotificationSettings, pinHash }).onConflictDoUpdate({ target: notificationSettings.ownerId, set: { pinHash } }).returning({ id: notificationSettings.id });
       await refreshOwnerBackup(ctx.user.id);
       return { success: true };
     }),
@@ -1416,7 +1418,7 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
       if (!sessionToken) {
         throw new TRPCError({ code: "UNAUTHORIZED", message: "سجّل الدخول لتفعيل التنبيهات التلقائية." });
       }
-      await db.insert(notificationSettings).values({ ownerId: ctx.user.id, ...settingsInput }).onDuplicateKeyUpdate({ set: settingsInput });
+      await db.insert(notificationSettings).values({ ownerId: ctx.user.id, ...settingsInput }).onConflictDoUpdate({ target: notificationSettings.ownerId, set: settingsInput }).returning({ id: notificationSettings.id });
       const settings = await getNotificationSettings(ctx.user.id);
       const cron = "0 */5 * * * *";
       if (settings.scheduleCronTaskUid) {
@@ -1471,8 +1473,8 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
           movementDate,
           notes: input.notes || `إضافة وارد للصنف الموجود: ${normalizedName}`,
           clientOperationId: input.clientOperationId,
-        });
-        const movementId = Number(movementResult[0].insertId);
+        }).returning({ id: inventoryMovements.id });
+        const movementId = Number(movementResult[0]?.id);
         if (shouldCreateInventoryPurchase(input.openingQuantity, input.defaultUnitCost)) {
           await db.insert(cashTransactions).values({
             ownerId: ctx.user.id,
@@ -1484,7 +1486,7 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
             sourceInventoryMovementId: movementId,
             recipientName: "مشتريات",
             notes: input.notes || `شراء ${input.openingQuantity} من ${duplicate[0].name}`,
-          });
+          }).returning({ id: cashTransactions.id });
         }
         await refreshOwnerBackup(ctx.user.id);
         return { id: duplicate[0].id, movementId, merged: true, duplicate: true };
@@ -1493,8 +1495,8 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
       // الصنف الجديد يبدأ برصيد افتتاحي صفري، وتُسجل الكمية المدخلة كحركة وارد
       // حتى يكون لها تاريخ واضح وتُربط بتكلفة شراء واحدة في الخزينة.
       const { openingQuantity, defaultUnitCost, clientOperationId, ...itemData } = input;
-      const result = await db.insert(inventoryItems).values({ ...itemData, name: normalizedName, openingQuantity: 0, defaultUnitCost, clientOperationId, ownerId: ctx.user.id });
-      const itemId = Number(result[0].insertId);
+      const result = await db.insert(inventoryItems).values({ ...itemData, name: normalizedName, openingQuantity: 0, defaultUnitCost, clientOperationId, ownerId: ctx.user.id }).returning({ id: inventoryItems.id });
+      const itemId = Number(result[0]?.id);
       let movementId: number | null = null;
       if (openingQuantity > 0) {
         const movementDate = new Date();
@@ -1508,8 +1510,8 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
           movementDate,
           notes: input.notes || `الرصيد الافتتاحي للصنف: ${normalizedName}`,
           clientOperationId,
-        });
-        movementId = Number(movementResult[0].insertId);
+        }).returning({ id: inventoryMovements.id });
+        movementId = Number(movementResult[0]?.id);
         if (shouldCreateInventoryPurchase(openingQuantity, defaultUnitCost)) {
           await db.insert(cashTransactions).values({
             ownerId: ctx.user.id,
@@ -1521,7 +1523,7 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
             sourceInventoryMovementId: movementId,
             recipientName: "مشتريات",
             notes: input.notes || `شراء ${openingQuantity} من ${normalizedName}`,
-          });
+          }).returning({ id: cashTransactions.id });
         }
       }
       await refreshOwnerBackup(ctx.user.id);
@@ -1569,8 +1571,8 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
       if (input.movementType === "outgoing" && input.quantity > currentBalance) {
         throw new TRPCError({ code: "BAD_REQUEST", message: `لا يمكن صرف ${input.quantity}؛ الرصيد المتاح هو ${currentBalance}.` });
       }
-      const movementResult = await db.insert(inventoryMovements).values({ ...input, ownerId: ctx.user.id });
-      const movementId = Number(movementResult[0].insertId);
+      const movementResult = await db.insert(inventoryMovements).values({ ...input, ownerId: ctx.user.id }).returning({ id: inventoryMovements.id });
+      const movementId = Number(movementResult[0]?.id);
       if (input.movementType === "incoming" && shouldCreateInventoryPurchase(input.quantity, input.unitCost)) {
         const purchaseAmount = calculateInventoryPurchaseAmount(input.quantity, input.unitCost);
         const existingPurchase = await db.select({ id: cashTransactions.id }).from(cashTransactions).where(and(eq(cashTransactions.ownerId, ctx.user.id), eq(cashTransactions.sourceInventoryMovementId, movementId))).limit(1);
@@ -1585,7 +1587,7 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
             sourceInventoryMovementId: movementId,
             recipientName: "مشتريات",
             notes: input.notes || `شراء ${input.quantity} من ${item[0].name}`,
-          });
+          }).returning({ id: cashTransactions.id });
         }
       }
       await refreshOwnerBackup(ctx.user.id);
@@ -1629,7 +1631,7 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
       const ownerId = assigned[0]?.ownerId;
       if (!ownerId) throw new TRPCError({ code: "FORBIDDEN", message: "لا يوجد أمر عمل نشط يسمح بمشاركة الموقع." });
       const now = new Date();
-      await db.insert(technicianLocations).values({ ownerId, technicianId: ctx.user.id, latitude: input.latitude, longitude: input.longitude, accuracy: input.accuracy ?? null, recordedAt: now, sharingUntil: input.sharingUntil ?? null }).onDuplicateKeyUpdate({ set: { latitude: input.latitude, longitude: input.longitude, accuracy: input.accuracy ?? null, recordedAt: now, sharingUntil: input.sharingUntil ?? null } });
+      await db.insert(technicianLocations).values({ ownerId, technicianId: ctx.user.id, latitude: input.latitude, longitude: input.longitude, accuracy: input.accuracy ?? null, recordedAt: now, sharingUntil: input.sharingUntil ?? null }).onConflictDoUpdate({ target: [technicianLocations.ownerId, technicianLocations.technicianId], set: { latitude: input.latitude, longitude: input.longitude, accuracy: input.accuracy ?? null, recordedAt: now, sharingUntil: input.sharingUntil ?? null } }).returning({ id: technicianLocations.id });
       return { success: true, recordedAt: now };
     }),
     latestLocations: adminProcedure.query(async ({ ctx }) => {
@@ -1689,9 +1691,9 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
         const existing = await db.select({ id: visits.id }).from(visits).where(and(eq(visits.ownerId, ctx.user.id), eq(visits.clientOperationId, input.clientOperationId))).limit(1);
         if (existing[0]) return { id: existing[0].id, alreadySynced: true };
       }
-      const inserted = await db.insert(visits).values({ customerId: customer.id, ownerId: ctx.user.id, visitType: input.visitType, visitDate: input.visitDate, technicianName: technician[0].name, assignedTechnicianId: technician[0].id, status: "assigned", notes: input.notes ?? null, clientOperationId: input.clientOperationId });
+      const inserted = await db.insert(visits).values({ customerId: customer.id, ownerId: ctx.user.id, visitType: input.visitType, visitDate: input.visitDate, technicianName: technician[0].name, assignedTechnicianId: technician[0].id, status: "assigned", notes: input.notes ?? null, clientOperationId: input.clientOperationId }).returning({ id: visits.id });
       await refreshOwnerBackup(ctx.user.id);
-      return { id: Number(inserted[0].insertId), alreadySynced: false };
+      return { id: Number(inserted[0]?.id), alreadySynced: false };
     }),
     addProof: protectedProcedure.input(workOrderProofInput).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
@@ -1709,11 +1711,11 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
       const extension = mimeType.split("/")[1];
       const key = `water-filter-proofs/${visit.ownerId}/${visit.id}/${Date.now()}-${randomBytes(6).toString("hex")}.${extension}`;
       const uploaded = await storagePut(key, buffer, mimeType);
-      const inserted = await db.insert(workOrderProofs).values({ ownerId: visit.ownerId, visitId: visit.id, uploadedBy: ctx.user.id, kind: input.kind, photoSlot: input.kind === "photo" ? (input.photoSlot ?? "general") : null, storageKey: uploaded.key, url: uploaded.url, mimeType });
+      const inserted = await db.insert(workOrderProofs).values({ ownerId: visit.ownerId, visitId: visit.id, uploadedBy: ctx.user.id, kind: input.kind, photoSlot: input.kind === "photo" ? (input.photoSlot ?? "general") : null, storageKey: uploaded.key, url: uploaded.url, mimeType }).returning({ id: workOrderProofs.id });
       if (input.kind === "photo" && input.photoSlot && input.photoSlot !== "general") {
         await db.update(visits).set(input.photoSlot === "before" ? { photoBeforeKey: uploaded.key } : { photoAfterKey: uploaded.key }).where(eq(visits.id, visit.id));
       }
-      return { id: Number(inserted[0].insertId), url: uploaded.url, kind: input.kind };
+      return { id: Number(inserted[0]?.id), url: uploaded.url, kind: input.kind };
     }),
     listProofs: protectedProcedure.input(z.object({ visitId: z.number().int().positive() })).query(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
@@ -1750,12 +1752,12 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
           const movements = await db.select().from(inventoryMovements).where(and(eq(inventoryMovements.ownerId, ownerId), eq(inventoryMovements.inventoryItemId, item.id)));
           const balance = calculateStockBalance(item.openingQuantity, movements);
           if (requested.quantity > balance) throw new TRPCError({ code: "BAD_REQUEST", message: `الرصيد غير كافٍ من صنف ${item.name}؛ المتاح ${balance}.` });
-          await db.insert(visitItems).values({ ownerId, visitId: visit.id, inventoryItemId: item.id, itemNameSnapshot: item.name, unitSnapshot: item.unit, quantity: requested.quantity, source: requested.source });
-          await db.insert(inventoryMovements).values({ ownerId, inventoryItemId: item.id, movementType: "outgoing", quantity: requested.quantity, unitCost: item.defaultUnitCost, currency: "SAR", movementDate: now, technicianName: visit.technicianName, notes: `منصرف لأمر عمل العميل ${visit.customerId}` });
+          await db.insert(visitItems).values({ ownerId, visitId: visit.id, inventoryItemId: item.id, itemNameSnapshot: item.name, unitSnapshot: item.unit, quantity: requested.quantity, source: requested.source }).returning({ id: visitItems.id });
+          await db.insert(inventoryMovements).values({ ownerId, inventoryItemId: item.id, movementType: "outgoing", quantity: requested.quantity, unitCost: item.defaultUnitCost, currency: "SAR", movementDate: now, technicianName: visit.technicianName, notes: `منصرف لأمر عمل العميل ${visit.customerId}` }).returning({ id: inventoryMovements.id });
         }
         if (input.collectedAmount > 0) {
           const category = visit.visitType === "installation" ? "تحصيل تركيب" : visit.visitType === "maintenance" ? "تحصيل صيانة" : visit.visitType === "cartridge_change" ? "تحصيل تغيير شمعات" : "تحصيل زيارة";
-          await db.insert(cashTransactions).values({ ownerId, transactionType: "income", currency: input.collectedCurrency, amount: input.collectedAmount, category, transactionDate: now, sourceVisitId: visit.id, recipientName: visit.technicianName, notes: `تحصيل من أمر عمل العميل ${visit.customerId}` });
+          await db.insert(cashTransactions).values({ ownerId, transactionType: "income", currency: input.collectedCurrency, amount: input.collectedAmount, category, transactionDate: now, sourceVisitId: visit.id, recipientName: visit.technicianName, notes: `تحصيل من أمر عمل العميل ${visit.customerId}` }).returning({ id: cashTransactions.id });
         }
       }
       await refreshOwnerBackup(ownerId);
@@ -1810,9 +1812,9 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
         const existing = await db.select({ id: cashTransactions.id }).from(cashTransactions).where(and(eq(cashTransactions.ownerId, ctx.user.id), eq(cashTransactions.clientOperationId, input.clientOperationId))).limit(1);
         if (existing[0]) return { id: existing[0].id };
       }
-      const result = await db.insert(cashTransactions).values({ ...input, ownerId: ctx.user.id });
+      const result = await db.insert(cashTransactions).values({ ...input, ownerId: ctx.user.id }).returning({ id: cashTransactions.id });
       await refreshOwnerBackup(ctx.user.id);
-      return { id: Number(result[0].insertId) };
+      return { id: Number(result[0]?.id) };
     }),
     delete: adminProcedure.input(sensitivePinInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       await requirePin(ctx.user.id, input.pin);

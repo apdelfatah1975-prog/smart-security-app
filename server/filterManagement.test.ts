@@ -28,6 +28,44 @@ function createContext(): TrpcContext {
   };
 }
 
+function withPostgresInsertMethods<T extends { insert?: (table: unknown) => unknown }>(db: T): T {
+  if (!db.insert) return db;
+  const originalInsert = db.insert;
+  return {
+    ...db,
+    insert: (table: unknown) => {
+      const originalBuilder = originalInsert(table) as { values?: (...args: unknown[]) => unknown };
+      if (!originalBuilder.values) return originalBuilder;
+      return {
+        ...originalBuilder,
+        values: (...args: unknown[]) => {
+          const rawResult = originalBuilder.values!(...args) as any;
+          if (rawResult && typeof rawResult.returning === "function") return rawResult;
+          const makeChain = (source: any): any => {
+            const promise = Promise.resolve(source);
+            const chain: any = {
+              returning: async () => {
+                const rows = await promise;
+                return (Array.isArray(rows) ? rows : []).map((row: any) => ({ id: row?.id ?? row?.insertId ?? 0 }));
+              },
+              onConflictDoUpdate: (...conflictArgs: unknown[]) => {
+                if (source && typeof source.onDuplicateKeyUpdate === "function") return makeChain(source.onDuplicateKeyUpdate(...conflictArgs));
+                return chain;
+              },
+              onConflictDoNothing: () => chain,
+              then: promise.then.bind(promise),
+              catch: promise.catch.bind(promise),
+              finally: promise.finally.bind(promise),
+            };
+            return chain;
+          };
+          return makeChain(rawResult);
+        },
+      };
+    },
+  } as T;
+}
+
 describe("واجهات إدارة فلاتر المياه", () => {
   it("يصنف نوع الطرف في عمليات الخزينة بشكل مستقل", () => {
     expect(classifyCashParty({ sourceVisitId: 12, category: "تحصيل صيانة", recipientName: "أحمد", notes: "عميل" })).toBe("customer");
@@ -54,7 +92,7 @@ describe("واجهات إدارة فلاتر المياه", () => {
       select: () => ({ from: (table: unknown) => ({ where: () => { const result = Promise.resolve(rowsByTable.get(table) ?? []) as Promise<unknown[]> & { limit?: () => Promise<unknown[]> }; result.limit = async () => rowsByTable.get(table) ?? []; return result; } }) }),
       delete: (table: unknown) => ({ where: async () => { deletedTables.push(table); } }),
     };
-    vi.mocked(getDb).mockResolvedValue(db as never);
+    vi.mocked(getDb).mockResolvedValue(withPostgresInsertMethods(db) as never);
     const result = await appRouter.createCaller(createContext()).filters.customers.deleteAllData({ pin: TEST_PIN, confirmation: "مسح كل بيانات التطبيق" });
     expect(result.success).toBe(true);
     expect(deletedTables).toEqual([workOrderProofs, visitItems, reminders, cashTransactions, visits, serviceTypeItems, serviceTypes, inventoryMovements, inventoryItems, technicianLocations, customers]);
@@ -78,7 +116,7 @@ describe("واجهات إدارة فلاتر المياه", () => {
       insert: (table: unknown) => ({ values: async (values: Record<string, unknown>) => { insertCalls.push({ table, values }); return [{ insertId: table === customers ? 77 : table === visits ? 88 : 0 }]; } }),
       update: () => ({ set: () => ({ where: async () => undefined }) }),
     };
-    vi.mocked(getDb).mockResolvedValue(db as never);
+    vi.mocked(getDb).mockResolvedValue(withPostgresInsertMethods(db) as never);
     const caller = appRouter.createCaller(createContext());
     const visitDate = new Date("2026-01-01T09:00:00.000Z");
 
@@ -107,7 +145,7 @@ describe("واجهات إدارة فلاتر المياه", () => {
         set: () => ({ where: async () => undefined }),
       }),
     };
-    vi.mocked(getDb).mockResolvedValue(db as never);
+    vi.mocked(getDb).mockResolvedValue(withPostgresInsertMethods(db) as never);
     const caller = appRouter.createCaller(createContext());
     await caller.filters.visits.create({
       customerId: 7,
@@ -140,7 +178,7 @@ describe("واجهات إدارة فلاتر المياه", () => {
         }),
       }),
     };
-    vi.mocked(getDb).mockResolvedValue(db as never);
+    vi.mocked(getDb).mockResolvedValue(withPostgresInsertMethods(db) as never);
     const caller = appRouter.createCaller(createContext());
     const visitDate = new Date("2026-01-01T09:00:00.000Z");
 
@@ -178,7 +216,7 @@ describe("واجهات إدارة فلاتر المياه", () => {
         }),
       }),
     };
-    vi.mocked(getDb).mockResolvedValue(db as never);
+    vi.mocked(getDb).mockResolvedValue(withPostgresInsertMethods(db) as never);
     const caller = appRouter.createCaller(createContext());
 
     try {
@@ -214,7 +252,7 @@ describe("واجهات إدارة فلاتر المياه", () => {
         }),
       }),
     };
-    vi.mocked(getDb).mockResolvedValue(db as never);
+    vi.mocked(getDb).mockResolvedValue(withPostgresInsertMethods(db) as never);
 
     try {
       await expect(appRouter.createCaller(createContext()).filters.customers.list({})).resolves.toMatchObject([{
@@ -253,7 +291,7 @@ describe("واجهات إدارة فلاتر المياه", () => {
         }),
       }),
     };
-    vi.mocked(getDb).mockResolvedValue(db as never);
+    vi.mocked(getDb).mockResolvedValue(withPostgresInsertMethods(db) as never);
     const caller = appRouter.createCaller(createContext());
     try {
       await expect(caller.filters.customers.list({ followUpStatus: "today" })).resolves.toHaveLength(1);
@@ -284,7 +322,7 @@ describe("واجهات إدارة فلاتر المياه", () => {
         }),
       }),
     };
-    vi.mocked(getDb).mockResolvedValue(db as never);
+    vi.mocked(getDb).mockResolvedValue(withPostgresInsertMethods(db) as never);
 
     try {
       await expect(appRouter.createCaller(createContext()).filters.reminders.due()).resolves.toMatchObject([{
@@ -321,7 +359,7 @@ describe("واجهات إدارة فلاتر المياه", () => {
         }),
       }),
     };
-    vi.mocked(getDb).mockResolvedValue(db as never);
+    vi.mocked(getDb).mockResolvedValue(withPostgresInsertMethods(db) as never);
     const caller = appRouter.createCaller(createContext());
 
     await caller.filters.customers.update({ id: 7, name: "بعد التعديل", phone: "01111111111", address: "العنوان الجديد", latitude: null, longitude: null, notes: "ملاحظة جديدة", pin: TEST_PIN });
@@ -374,7 +412,7 @@ describe("واجهات إدارة فلاتر المياه", () => {
         }),
       }),
     };
-    vi.mocked(getDb).mockResolvedValue(db as never);
+    vi.mocked(getDb).mockResolvedValue(withPostgresInsertMethods(db) as never);
     const caller = appRouter.createCaller(createContext());
 
     try {
@@ -407,7 +445,7 @@ describe("واجهات إدارة فلاتر المياه", () => {
         }),
       }),
     };
-    vi.mocked(getDb).mockResolvedValue(db as never);
+    vi.mocked(getDb).mockResolvedValue(withPostgresInsertMethods(db) as never);
     const caller = appRouter.createCaller(createContext());
 
     await caller.filters.visits.create({ customerId: 7, visitType: "follow_up", visitDate: new Date("2026-01-02T09:00:00.000Z") });
@@ -426,7 +464,7 @@ describe("واجهات إدارة فلاتر المياه", () => {
       }),
       insert,
     };
-    vi.mocked(getDb).mockResolvedValue(db as never);
+    vi.mocked(getDb).mockResolvedValue(withPostgresInsertMethods(db) as never);
     const caller = appRouter.createCaller(createContext());
 
     await expect(caller.filters.visits.create({
@@ -447,7 +485,7 @@ describe("واجهات إدارة فلاتر المياه", () => {
       select: () => ({ from: (table: unknown) => ({ where: () => ({ limit: async () => table === notificationSettings ? [{ ownerId: 1, pinHash: TEST_PIN_HASH }] : table === visits ? [firstVisit] : table === reminders ? [pendingReminder] : [] }) }) }),
       update: (table: unknown) => ({ set: (values: Record<string, unknown>) => ({ where: async () => { updateCalls.push({ table, values }); } }) }),
     };
-    vi.mocked(getDb).mockResolvedValue(db as never);
+    vi.mocked(getDb).mockResolvedValue(withPostgresInsertMethods(db) as never);
     const caller = appRouter.createCaller(createContext());
     const correctedDate = new Date("2026-01-05T11:30:00.000Z");
 
@@ -468,7 +506,7 @@ describe("واجهات إدارة فلاتر المياه", () => {
         }),
       }),
     };
-    vi.mocked(getDb).mockResolvedValue(db as never);
+    vi.mocked(getDb).mockResolvedValue(withPostgresInsertMethods(db) as never);
     const caller = appRouter.createCaller(createContext());
 
     await expect(caller.filters.inventory.createMovement({
@@ -488,7 +526,7 @@ describe("واجهات إدارة فلاتر المياه", () => {
       }),
       update: () => ({ set: () => ({ where: async () => undefined }) }),
     };
-    vi.mocked(getDb).mockResolvedValue(db as never);
+    vi.mocked(getDb).mockResolvedValue(withPostgresInsertMethods(db) as never);
     const caller = appRouter.createCaller(createContext());
 
     await expect(caller.filters.reminders.updateStatus({ id: 404, status: "completed", pin: TEST_PIN }))
@@ -505,7 +543,7 @@ describe("واجهات إدارة فلاتر المياه", () => {
         }),
       }),
     };
-    vi.mocked(getDb).mockResolvedValue(db as never);
+    vi.mocked(getDb).mockResolvedValue(withPostgresInsertMethods(db) as never);
     const caller = appRouter.createCaller(createContext());
 
     await expect(caller.filters.reminders.updateStatus({ id: 19, status: "dismissed", pin: TEST_PIN }))
@@ -525,7 +563,7 @@ describe("واجهات إدارة فلاتر المياه", () => {
       insert: (table: unknown) => ({ values: async (values: Record<string, unknown>) => { insertCalls.push({ table, values }); return [{ insertId: table === visits ? 123 : 456 }]; } }),
       update: () => ({ set: () => ({ where: async () => undefined }) }),
     };
-    vi.mocked(getDb).mockResolvedValue(db as never);
+    vi.mocked(getDb).mockResolvedValue(withPostgresInsertMethods(db) as never);
     const caller = appRouter.createCaller(createContext());
 
     await expect(caller.filters.visits.create({
@@ -552,7 +590,7 @@ describe("واجهات إدارة فلاتر المياه", () => {
         },
       }),
     };
-    vi.mocked(getDb).mockResolvedValue(db as never);
+    vi.mocked(getDb).mockResolvedValue(withPostgresInsertMethods(db) as never);
     const caller = appRouter.createCaller(createContext());
 
     await expect(caller.filters.cash.create({
@@ -579,7 +617,7 @@ describe("واجهات إدارة فلاتر المياه", () => {
       }),
       delete: () => ({ where: async () => { deleted = true; } }),
     };
-    vi.mocked(getDb).mockResolvedValue(db as never);
+    vi.mocked(getDb).mockResolvedValue(withPostgresInsertMethods(db) as never);
     const caller = appRouter.createCaller(createContext());
     await expect(caller.filters.cash.delete({ id: 91, pin: "9999" })).rejects.toMatchObject({ code: "FORBIDDEN" });
     expect(deleted).toBe(false);
@@ -622,7 +660,7 @@ describe("واجهات إدارة فلاتر المياه", () => {
 				}),
 			}),
 		};
-		vi.mocked(getDb).mockResolvedValue(db as never);
+		vi.mocked(getDb).mockResolvedValue(withPostgresInsertMethods(db) as never);
 		const caller = appRouter.createCaller(createContext());
 
 		const beforeSave = await caller.filters.notifications.nextAlert();
@@ -676,7 +714,7 @@ describe("واجهات إدارة فلاتر المياه", () => {
 				}),
 			}),
 		};
-		vi.mocked(getDb).mockResolvedValue(db as never);
+		vi.mocked(getDb).mockResolvedValue(withPostgresInsertMethods(db) as never);
 		const caller = appRouter.createCaller(createContext());
 
 		try {
@@ -696,7 +734,7 @@ describe("المخزن ومنع تكرار الأصناف", () => {
       select: () => ({ from: () => ({ where: () => ({ limit: async () => [{ id: 41, ownerId: 1, name: "فلتر جامبو" }] }) }) }),
       insert: (table: unknown) => ({ values: async (values: Record<string, unknown>) => { insertCalls.push({ table, values }); return [{ insertId: table === inventoryMovements ? 91 : 0 }]; } }),
     };
-    vi.mocked(getDb).mockResolvedValue(db as never);
+    vi.mocked(getDb).mockResolvedValue(withPostgresInsertMethods(db) as never);
     const caller = appRouter.createCaller(createContext());
     const result = await caller.filters.inventory.createItem({ name: "فلتر جامبو", category: "فلاتر", unit: "قطعة", reorderLevel: 2, defaultUnitCost: 1250, openingQuantity: 4, notes: "وارد جديد" });
     expect(result).toMatchObject({ id: 41, merged: true, duplicate: true, movementId: 91 });
@@ -739,7 +777,7 @@ describe("صلاحيات الفني والإدارة", () => {
       }),
       update: () => ({ set: () => ({ where: async () => undefined }) }),
     };
-    vi.mocked(getDb).mockResolvedValue(db as never);
+    vi.mocked(getDb).mockResolvedValue(withPostgresInsertMethods(db) as never);
     const caller = appRouter.createCaller(createTechnicianContext());
 
     await expect(caller.filters.visits.create({
@@ -762,7 +800,7 @@ describe("صلاحيات الفني والإدارة", () => {
         }),
       }),
     };
-    vi.mocked(getDb).mockResolvedValue(db as never);
+    vi.mocked(getDb).mockResolvedValue(withPostgresInsertMethods(db) as never);
     const caller = appRouter.createCaller(createContext());
 
     await expect(caller.filters.visits.create({
@@ -794,7 +832,7 @@ describe("صلاحيات الفني والإدارة", () => {
         },
       }),
     };
-    vi.mocked(getDb).mockResolvedValue(db as never);
+    vi.mocked(getDb).mockResolvedValue(withPostgresInsertMethods(db) as never);
     const caller = appRouter.createCaller(createTechnicianContext());
 
     await expect(caller.filters.workOrders.list()).resolves.toMatchObject([{ id: 101, assignedTechnicianId: 9, customer: { id: 7, name: "عميل الشركة" } }]);

@@ -1,21 +1,59 @@
 import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { migrate } from "drizzle-orm/postgres-js/migrator";
+import { resolve } from "node:path";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import { InsertUser, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
+let _client: ReturnType<typeof postgres> | null = null;
 let _db: ReturnType<typeof drizzle> | null = null;
+let _migrationPromise: Promise<boolean> | null = null;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      _client = postgres(process.env.DATABASE_URL, {
+        max: 10,
+        idle_timeout: 20,
+        connect_timeout: 10,
+        prepare: false,
+      });
+      _db = drizzle(_client);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
     }
   }
   return _db;
+}
+
+/**
+ * Apply committed PostgreSQL migrations once per process. Render keeps the
+ * migration files beside the built server, so every cold start is safe and
+ * idempotent while a missing DATABASE_URL still supports local-only preview.
+ */
+export async function initializeDatabase(): Promise<boolean> {
+  if (!process.env.DATABASE_URL) {
+    console.warn("[Database] DATABASE_URL is not configured; running without cloud persistence.");
+    return false;
+  }
+  if (!_migrationPromise) {
+    _migrationPromise = (async () => {
+      const db = await getDb();
+      if (!db) return false;
+      try {
+        await migrate(db, { migrationsFolder: resolve(process.cwd(), "drizzle-pg") });
+        console.log("[Database] PostgreSQL migrations applied successfully.");
+        return true;
+      } catch (error) {
+        console.error("[Database] PostgreSQL migration failed:", error);
+        throw error;
+      }
+    })();
+  }
+  return _migrationPromise;
 }
 
 export async function upsertUser(user: InsertUser): Promise<void> {
@@ -68,7 +106,8 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet.lastSignedIn = new Date();
     }
 
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
+    await db.insert(users).values(values).onConflictDoUpdate({
+      target: users.openId,
       set: updateSet,
     });
   } catch (error) {

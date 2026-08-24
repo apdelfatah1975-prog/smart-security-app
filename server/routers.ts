@@ -32,8 +32,8 @@ export const appRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "قاعدة البيانات غير متاحة." });
       const existingLocal = await db.select({ id: users.id }).from(users).where(isNotNull(users.passwordHash)).limit(1);
       const openId = `local-${crypto.randomUUID()}`;
-      const inserted = await db.insert(users).values({ openId, name: input.name.trim(), email, passwordHash: await hashPassword(input.password), loginMethod: "local-password", role: existingLocal.length ? "user" : "admin", lastSignedIn: new Date() });
-      const created = await db.select().from(users).where(eq(users.id, Number(inserted[0].insertId))).limit(1);
+      const inserted = await db.insert(users).values({ openId, name: input.name.trim(), email, passwordHash: await hashPassword(input.password), loginMethod: "local-password", role: existingLocal.length ? "user" : "admin", lastSignedIn: new Date() }).returning({ id: users.id });
+      const created = await db.select().from(users).where(eq(users.id, Number(inserted[0]?.id))).limit(1);
       if (!created[0]) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "تعذر إنشاء الحساب." });
       await setLocalSessionCookie(ctx.req, ctx.res, created[0]);
       return { success: true, user: created[0] } as const;

@@ -8,11 +8,11 @@ const workOrders = readFileSync(new URL("../client/src/pages/WorkOrders.tsx", im
 
 describe("field improvements contracts", () => {
   it("keeps visit TDS and before/after photo references in the schema", () => {
-    expect(schema).toContain('tdsIn: int("tdsIn")');
-    expect(schema).toContain('tdsOut: int("tdsOut")');
+    expect(schema).toContain('tdsIn: integer("tdsIn")');
+    expect(schema).toContain('tdsOut: integer("tdsOut")');
     expect(schema).toContain('photoBeforeKey: varchar("photoBeforeKey"');
     expect(schema).toContain('photoAfterKey: varchar("photoAfterKey"');
-    expect(schema).toContain('photoSlot: mysqlEnum("photoSlot"');
+    expect(schema).toContain('photoSlot: workOrderPhotoSlotEnum("photoSlot"');
   });
 
   it("exposes photo slots, TDS persistence, and daily closing procedure", () => {
