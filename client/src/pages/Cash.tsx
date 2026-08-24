@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { moveToTrash } from "@/lib/trashBin";
 import { formatAppMoney } from "@/lib/appSettings";
 import { extractArray } from "@/lib/dataNormalization";
+import InternalPageHeader from "@/components/InternalPageHeader";
 
 type Currency = "SAR";
 type IncomeFilter = "all" | "service" | "installation" | "maintenance";
@@ -174,13 +175,19 @@ export default function Cash() {
   ]);
 
   return <div className="mx-auto max-w-7xl space-y-6">
-    <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-      <div><h1 className="page-heading">الخزينة</h1><p className="page-subheading">الإيرادات والمصروفات والرصيد في مكان واحد.</p></div>
-      <div className="flex flex-wrap gap-2"><Button onClick={() => { setTransactionType("income"); setOpen(true); }} className="h-11 rounded-xl bg-teal-700 px-4 font-bold hover:bg-teal-800"><ArrowDownRight className="ml-2 h-5 w-5" />تسجيل إيراد</Button><Button onClick={() => { setTransactionType("expense"); setOpen(true); }} className="h-11 rounded-xl bg-amber-600 px-4 font-bold text-white hover:bg-amber-700"><ArrowUpLeft className="ml-2 h-5 w-5" />تسجيل مصروف</Button></div>
-    </div>
+    <InternalPageHeader
+      eyebrow="الإدارة المالية"
+      title="الخزينة"
+      description="تابع الإيرادات والمصروفات والرصيد في لوحة واضحة، وسجّل حركة مالية جديدة في ثوانٍ."
+      actions={<>
+        <Button onClick={() => { setTransactionType("income"); setOpen(true); }} className="h-11 rounded-xl bg-white px-4 font-bold text-teal-950 hover:bg-teal-50"><ArrowDownRight className="ml-2 h-5 w-5" />تسجيل إيراد</Button>
+        <Button onClick={() => { setTransactionType("expense"); setOpen(true); }} className="h-11 rounded-xl bg-amber-500 px-4 font-bold text-white hover:bg-amber-600"><ArrowUpLeft className="ml-2 h-5 w-5" />تسجيل مصروف</Button>
+      </>}
+      summaries={summaryCards.map((card) => ({ label: card.label, value: formatMoney(card.amount, card.currency), tone: card.label.includes("مصروف") ? "amber" : card.label.includes("رصيد") ? "slate" : "teal" }))}
+    />
 
-    <section className="grid gap-2 sm:grid-cols-3">
-      {summaryCards.map(card => <article key={`${card.currency}-${card.label}`} className={`rounded-xl p-3 shadow-sm ${card.tone}`}><div className="flex items-center gap-2"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/70"><card.icon className="h-4 w-4 opacity-80" /></span><div className="min-w-0"><p className="truncate text-xs font-bold opacity-80">{card.label}</p><p className="mt-1 text-base font-extrabold tracking-tight">{formatMoney(card.amount, card.currency)}</p></div></div></article>)}
+    <section className="grid gap-3 sm:grid-cols-3">
+      {summaryCards.map(card => <article key={`${card.currency}-${card.label}`} className={`rounded-2xl p-4 shadow-sm ring-1 ring-black/5 ${card.tone}`}><div className="flex items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/70"><card.icon className="h-5 w-5 opacity-80" /></span><div className="min-w-0"><p className="truncate text-xs font-black opacity-80">{card.label}</p><p className="mt-1 text-lg font-black tracking-tight">{formatMoney(card.amount, card.currency)}</p></div></div></article>)}
     </section>
 
     <details className="soft-card group">

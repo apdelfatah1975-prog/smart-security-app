@@ -153,6 +153,59 @@ export const smartSecurityRouter = router({
     }
     throw new TRPCError({ code: "BAD_REQUEST", message: "نوع السجل غير مدعوم." });
   }),
+  update: protectedProcedure.input(z.object({ entity: z.enum(["staff", "workLocations", "attendance", "patrols", "patrolPlans", "entries", "debts", "children", "teachers", "lessons", "vehicles", "vehicleVisits"]), id: z.number().int().positive(), payload: z.record(z.string(), z.unknown()) })).mutation(async ({ ctx, input }) => {
+    const db = await requireDb();
+    const ownerId = ctx.user.id;
+    const p = input.payload;
+    const text = (key: string) => typeof p[key] === "string" && p[key] !== "" ? String(p[key]) : null;
+    const numericId = (key: string) => parseClientId(text(key) ?? p[key]);
+    const requiredId = (key: string) => { const value = numericId(key); if (!value) throw new TRPCError({ code: "BAD_REQUEST", message: "المعرف المرتبط بالسجل غير صالح." }); return value; };
+    const date = (key: string) => { const value = text(key); return value ? new Date(value) : null; };
+    if (input.entity === "staff") {
+      await db.update(securityStaff).set({ staffCode: text("code") || `staff-${input.id}`, fullName: text("name") || "فرد أمن", nationalId: text("nationalId"), phone: text("phone"), branch: text("branch") || "غير محدد", atmLocation: text("atm"), shift: (text("shift") as "morning" | "evening" | "night" | "off" | null) || "morning", hireDate: date("hireDate"), workStartDate: date("workStartDate"), emergencyPhone: text("emergencyPhone"), photoUrl: text("image")?.startsWith("http") || text("image")?.startsWith("/manus-storage/") ? text("image") : null, licenseStatus: text("licenseStatus") === "licensed" ? "licensed" : "unlicensed", weaponNumber: text("weaponNumber"), licenseNumber: text("licenseNumber"), licenseExpiry: date("licenseExpiry"), retirementDate: date("retirementDate"), monthlyRate: Number(p.rate) || 0, isActive: p.active !== false, notes: text("notes") }).where(and(eq(securityStaff.id, input.id), eq(securityStaff.ownerId, ownerId)));
+    } else if (input.entity === "attendance") {
+      await db.update(securityAttendance).set({ staffId: requiredId("staffId"), attendanceDate: date("date") || new Date(), shift: (text("shift") as "morning" | "evening" | "night" | "off" | "leave") || "morning", status: (text("status") as "present" | "absent" | "excused") || "present", hours: Number(p.hours) || 0, notes: text("notes") }).where(and(eq(securityAttendance.id, input.id), eq(securityAttendance.ownerId, ownerId)));
+    } else if (input.entity === "patrols") {
+      await db.update(securityPatrols).set({ staffId: numericId("staffId"), branch: text("branch") || "غير محدد", patrolDate: date("date") || new Date(), checkpoint: text("checkpoint"), notes: text("notes"), photoUrl: text("photo")?.startsWith("http") || text("photo")?.startsWith("/manus-storage/") ? text("photo") : null }).where(and(eq(securityPatrols.id, input.id), eq(securityPatrols.ownerId, ownerId)));
+    } else if (input.entity === "workLocations") {
+      await db.update(securityWorkLocations).set({ staffId: requiredId("staffId"), locationName: text("location") || "غير محدد", fromDate: date("fromDate") || new Date(), toDate: date("toDate"), transferReason: text("reason"), notes: text("notes") }).where(and(eq(securityWorkLocations.id, input.id), eq(securityWorkLocations.ownerId, ownerId)));
+    } else if (input.entity === "patrolPlans") {
+      await db.update(securityPatrolPlans).set({ staffId: numericId("staffId"), branch: text("branch") || "غير محدد", checkpoint: text("checkpoint") || "غير محدد", planDate: date("date") || new Date(), shift: (text("shift") as "morning" | "evening" | "night" | "off") || "morning", repeatWeekly: p.repeatWeekly === true, notes: text("notes") }).where(and(eq(securityPatrolPlans.id, input.id), eq(securityPatrolPlans.ownerId, ownerId)));
+    } else if (input.entity === "entries") {
+      await db.update(financeEntries).set({ entryType: text("type") === "expense" ? "expense" : "income", category: text("category") || "عام", amount: Math.max(0, Number(p.amount) || 0), entryDate: date("date") || new Date(), description: text("notes") }).where(and(eq(financeEntries.id, input.id), eq(financeEntries.ownerId, ownerId)));
+    } else if (input.entity === "debts") {
+      const totalAmount = Math.max(0, Number(p.total) || 0); const paidAmount = Math.max(0, Number(p.paid) || 0);
+      await db.update(debts).set({ personName: text("name") || "غير محدد", direction: text("direction") === "payable" ? "payable" : "receivable", totalAmount, paidAmount, dueDate: date("due"), status: paidAmount >= totalAmount ? "settled" : paidAmount > 0 ? "partial" : "open", notes: text("notes") }).where(and(eq(debts.id, input.id), eq(debts.ownerId, ownerId)));
+    } else if (input.entity === "children") {
+      await db.update(children).set({ fullName: text("name") || "ابن/ابنة", grade: text("grade"), school: text("school"), phone: text("phone"), notes: text("notes") }).where(and(eq(children.id, input.id), eq(children.ownerId, ownerId)));
+    } else if (input.entity === "teachers") {
+      await db.update(teachers).set({ fullName: text("name") || "مدرس", subject: text("subject") || "عام", phone: text("phone"), monthlyCost: Math.max(0, Number(p.cost) || 0), notes: text("notes") }).where(and(eq(teachers.id, input.id), eq(teachers.ownerId, ownerId)));
+    } else if (input.entity === "lessons") {
+      await db.update(lessons).set({ childId: requiredId("childId"), teacherId: numericId("teacherId"), subject: text("subject") || "درس", lessonDate: date("date") || new Date(), durationMinutes: 60, cost: Math.max(0, Number(p.cost) || 0), status: text("status") === "completed" ? "completed" : "scheduled", notes: text("notes") }).where(and(eq(lessons.id, input.id), eq(lessons.ownerId, ownerId)));
+    } else if (input.entity === "vehicles") {
+      await db.update(personalVehicles).set({ vehicleType: (text("type") as "car" | "motorcycle" | "tuk_tuk" | "other") || "other", customType: text("customType"), make: text("make"), model: text("model"), color: text("color"), plateNumber: text("plate"), vin: text("vin"), purchaseDate: date("purchaseDate"), saleDate: date("saleDate"), ownership: (text("ownership") as "owned" | "sold" | "leased") || "owned", licenseStatus: (text("licenseStatus") as "valid" | "expired" | "withdrawn" | "unlicensed") || "unlicensed", licenseNumber: text("licenseNumber"), licenseExpiry: date("licenseExpiry"), licenseWithdrawnDate: date("licenseWithdrawnDate"), licenseWithdrawalReason: text("licenseWithdrawalReason"), notes: text("notes") }).where(and(eq(personalVehicles.id, input.id), eq(personalVehicles.ownerId, ownerId)));
+    } else if (input.entity === "vehicleVisits") {
+      await db.update(personalVehicleVisits).set({ vehicleId: requiredId("vehicleId"), visitDate: date("date") || new Date(), visitType: (text("kind") as "inspection" | "renewal" | "license" | "withdrawal" | "other") || "other", result: text("result"), nextDueDate: date("nextDue"), fees: Math.max(0, Number(p.fees) || 0), notes: text("notes") }).where(and(eq(personalVehicleVisits.id, input.id), eq(personalVehicleVisits.ownerId, ownerId)));
+    }
+    return { entity: input.entity, id: input.id, success: true } as const;
+  }),
+  delete: protectedProcedure.input(z.object({ entity: z.enum(["staff", "workLocations", "attendance", "patrols", "patrolPlans", "entries", "debts", "children", "teachers", "lessons", "vehicles", "vehicleVisits"]), id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+    const db = await requireDb();
+    const ownerId = ctx.user.id;
+    if (input.entity === "staff") await db.delete(securityStaff).where(and(eq(securityStaff.id, input.id), eq(securityStaff.ownerId, ownerId)));
+    else if (input.entity === "attendance") await db.delete(securityAttendance).where(and(eq(securityAttendance.id, input.id), eq(securityAttendance.ownerId, ownerId)));
+    else if (input.entity === "patrols") await db.delete(securityPatrols).where(and(eq(securityPatrols.id, input.id), eq(securityPatrols.ownerId, ownerId)));
+    else if (input.entity === "workLocations") await db.delete(securityWorkLocations).where(and(eq(securityWorkLocations.id, input.id), eq(securityWorkLocations.ownerId, ownerId)));
+    else if (input.entity === "patrolPlans") await db.delete(securityPatrolPlans).where(and(eq(securityPatrolPlans.id, input.id), eq(securityPatrolPlans.ownerId, ownerId)));
+    else if (input.entity === "entries") await db.delete(financeEntries).where(and(eq(financeEntries.id, input.id), eq(financeEntries.ownerId, ownerId)));
+    else if (input.entity === "debts") await db.delete(debts).where(and(eq(debts.id, input.id), eq(debts.ownerId, ownerId)));
+    else if (input.entity === "children") await db.delete(children).where(and(eq(children.id, input.id), eq(children.ownerId, ownerId)));
+    else if (input.entity === "teachers") await db.delete(teachers).where(and(eq(teachers.id, input.id), eq(teachers.ownerId, ownerId)));
+    else if (input.entity === "lessons") await db.delete(lessons).where(and(eq(lessons.id, input.id), eq(lessons.ownerId, ownerId)));
+    else if (input.entity === "vehicles") await db.delete(personalVehicles).where(and(eq(personalVehicles.id, input.id), eq(personalVehicles.ownerId, ownerId)));
+    else await db.delete(personalVehicleVisits).where(and(eq(personalVehicleVisits.id, input.id), eq(personalVehicleVisits.ownerId, ownerId)));
+    return { entity: input.entity, id: input.id, success: true } as const;
+  }),
   staff: router({
     list: protectedProcedure.input(z.object({ search: z.string().trim().max(160).optional() }).optional()).query(async ({ ctx, input }) => {
       const db = await requireDb();
