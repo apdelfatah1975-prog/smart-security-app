@@ -34,14 +34,14 @@ describe("SecurityCommandCenter location cards", () => {
 
     expect(screen.getAllByText("أحمد مطوبس").length).toBeGreaterThan(0);
     expect(screen.getByText(/١ فرد معروض/)).toBeTruthy();
-    expect(screen.getByText("تفاصيل الملف")).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: /أحمد مطوبس/ }).length).toBeGreaterThan(0);
   });
 
   it("opens the complete staff profile callback from a location result", () => {
     const onOpenStaff = vi.fn();
     render(<SecurityCommandCenter {...baseProps} onOpenStaff={onOpenStaff} staff={[{ id: "1", name: "حارس مطوبس", branch: "فرع مطوبس", active: true }]} />);
 
-    fireEvent.click(screen.getAllByRole("button", { name: /تفاصيل الملف/ })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: /حارس مطوبس/ })[0]);
 
     expect(onOpenStaff).toHaveBeenCalledWith(expect.objectContaining({ id: "1", name: "حارس مطوبس" }));
   });

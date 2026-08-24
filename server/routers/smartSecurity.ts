@@ -132,15 +132,15 @@ export const smartSecurityRouter = router({
       return { entity: input.entity, id: Number(result[0]?.id), success: true } as const;
     }
     if (input.entity === "children") {
-      const result = await db.insert(children).values({ ownerId, fullName: text("name") || "ابن/ابنة", grade: text("grade"), school: text("school"), phone: text("phone"), notes: text("notes") }).returning({ id: children.id });
+      const result = await db.insert(children).values({ ownerId, fullName: text("name") || "ابن/ابنة", relation: text("relation") || "ابن/ابنة", nationalId: text("nationalId"), birthDate: date("birthDate"), grade: text("grade"), school: text("school"), phone: text("phone"), bloodType: text("bloodType"), healthNotes: text("healthNotes"), notes: text("notes") }).returning({ id: children.id });
       return { entity: input.entity, id: Number(result[0]?.id), success: true } as const;
     }
     if (input.entity === "teachers") {
-      const result = await db.insert(teachers).values({ ownerId, fullName: text("name") || "مدرس", subject: text("subject") || "عام", phone: text("phone"), monthlyCost: Math.max(0, Number(p.cost) || 0), notes: text("notes") }).returning({ id: teachers.id });
+      const result = await db.insert(teachers).values({ ownerId, fullName: text("name") || "مدرس", subject: text("subject") || "عام", phone: text("phone"), whatsapp: text("whatsapp"), monthlyCost: Math.max(0, Number(p.cost) || 0), availability: text("availability"), notes: text("notes") }).returning({ id: teachers.id });
       return { entity: input.entity, id: Number(result[0]?.id), success: true } as const;
     }
     if (input.entity === "lessons") {
-      const result = await db.insert(lessons).values({ ownerId, childId: requiredId("childId"), teacherId: numericId("teacherId"), subject: text("subject") || "درس", lessonDate: date("date") || new Date(), durationMinutes: 60, cost: Math.max(0, Number(p.cost) || 0), status: text("status") === "completed" ? "completed" : "scheduled", notes: text("notes") }).returning({ id: lessons.id });
+      const result = await db.insert(lessons).values({ ownerId, childId: requiredId("childId"), teacherId: numericId("teacherId"), subject: text("subject") || "درس", lessonDate: date("date") || new Date(), durationMinutes: Math.max(1, Number(p.durationMinutes) || 60), weekDay: text("weekDay"), cost: Math.max(0, Number(p.cost) || 0), paidAmount: Math.max(0, Number(p.paidAmount) || 0), status: text("status") === "completed" ? "completed" : text("status") === "cancelled" ? "cancelled" : "scheduled", notes: text("notes") }).returning({ id: lessons.id });
       return { entity: input.entity, id: Number(result[0]?.id), success: true } as const;
     }
     if (input.entity === "vehicles") {
@@ -177,11 +177,11 @@ export const smartSecurityRouter = router({
       const totalAmount = Math.max(0, Number(p.total) || 0); const paidAmount = Math.max(0, Number(p.paid) || 0);
       await db.update(debts).set({ personName: text("name") || "غير محدد", direction: text("direction") === "payable" ? "payable" : "receivable", totalAmount, paidAmount, dueDate: date("due"), status: paidAmount >= totalAmount ? "settled" : paidAmount > 0 ? "partial" : "open", notes: text("notes") }).where(and(eq(debts.id, input.id), eq(debts.ownerId, ownerId)));
     } else if (input.entity === "children") {
-      await db.update(children).set({ fullName: text("name") || "ابن/ابنة", grade: text("grade"), school: text("school"), phone: text("phone"), notes: text("notes") }).where(and(eq(children.id, input.id), eq(children.ownerId, ownerId)));
+      await db.update(children).set({ fullName: text("name") || "ابن/ابنة", relation: text("relation") || "ابن/ابنة", nationalId: text("nationalId"), birthDate: date("birthDate"), grade: text("grade"), school: text("school"), phone: text("phone"), bloodType: text("bloodType"), healthNotes: text("healthNotes"), notes: text("notes") }).where(and(eq(children.id, input.id), eq(children.ownerId, ownerId)));
     } else if (input.entity === "teachers") {
-      await db.update(teachers).set({ fullName: text("name") || "مدرس", subject: text("subject") || "عام", phone: text("phone"), monthlyCost: Math.max(0, Number(p.cost) || 0), notes: text("notes") }).where(and(eq(teachers.id, input.id), eq(teachers.ownerId, ownerId)));
+      await db.update(teachers).set({ fullName: text("name") || "مدرس", subject: text("subject") || "عام", phone: text("phone"), whatsapp: text("whatsapp"), monthlyCost: Math.max(0, Number(p.cost) || 0), availability: text("availability"), notes: text("notes") }).where(and(eq(teachers.id, input.id), eq(teachers.ownerId, ownerId)));
     } else if (input.entity === "lessons") {
-      await db.update(lessons).set({ childId: requiredId("childId"), teacherId: numericId("teacherId"), subject: text("subject") || "درس", lessonDate: date("date") || new Date(), durationMinutes: 60, cost: Math.max(0, Number(p.cost) || 0), status: text("status") === "completed" ? "completed" : "scheduled", notes: text("notes") }).where(and(eq(lessons.id, input.id), eq(lessons.ownerId, ownerId)));
+      await db.update(lessons).set({ childId: requiredId("childId"), teacherId: numericId("teacherId"), subject: text("subject") || "درس", lessonDate: date("date") || new Date(), durationMinutes: Math.max(1, Number(p.durationMinutes) || 60), weekDay: text("weekDay"), cost: Math.max(0, Number(p.cost) || 0), paidAmount: Math.max(0, Number(p.paidAmount) || 0), status: text("status") === "completed" ? "completed" : text("status") === "cancelled" ? "cancelled" : "scheduled", notes: text("notes") }).where(and(eq(lessons.id, input.id), eq(lessons.ownerId, ownerId)));
     } else if (input.entity === "vehicles") {
       await db.update(personalVehicles).set({ vehicleType: (text("type") as "car" | "motorcycle" | "tuk_tuk" | "other") || "other", customType: text("customType"), make: text("make"), model: text("model"), color: text("color"), plateNumber: text("plate"), vin: text("vin"), purchaseDate: date("purchaseDate"), saleDate: date("saleDate"), ownership: (text("ownership") as "owned" | "sold" | "leased") || "owned", licenseStatus: (text("licenseStatus") as "valid" | "expired" | "withdrawn" | "unlicensed") || "unlicensed", licenseNumber: text("licenseNumber"), licenseExpiry: date("licenseExpiry"), licenseWithdrawnDate: date("licenseWithdrawnDate"), licenseWithdrawalReason: text("licenseWithdrawalReason"), notes: text("notes") }).where(and(eq(personalVehicles.id, input.id), eq(personalVehicles.ownerId, ownerId)));
     } else if (input.entity === "vehicleVisits") {
@@ -325,7 +325,7 @@ export const smartSecurityRouter = router({
       const db = await requireDb();
       return db.select().from(children).where(eq(children.ownerId, ctx.user.id)).orderBy(desc(children.createdAt));
     }),
-    create: protectedProcedure.input(z.object({ fullName: z.string().trim().min(2).max(160), grade: z.string().trim().max(80).optional().nullable(), school: z.string().trim().max(160).optional().nullable(), phone: z.string().trim().max(32).optional().nullable(), notes: optionalText })).mutation(async ({ ctx, input }) => {
+    create: protectedProcedure.input(z.object({ fullName: z.string().trim().min(2).max(160), relation: z.string().trim().max(40).optional().nullable(), nationalId: z.string().trim().regex(/^\\d{14}$/).optional().nullable(), birthDate: dateValue.optional().nullable(), grade: z.string().trim().max(80).optional().nullable(), school: z.string().trim().max(160).optional().nullable(), phone: z.string().trim().max(32).optional().nullable(), bloodType: z.string().trim().max(12).optional().nullable(), healthNotes: optionalText, notes: optionalText })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
       const result = await db.insert(children).values({ ...input, ownerId: ctx.user.id }).returning({ id: children.id });
       return { id: Number(result[0]?.id), success: true } as const;
@@ -336,7 +336,7 @@ export const smartSecurityRouter = router({
       const db = await requireDb();
       return db.select().from(teachers).where(eq(teachers.ownerId, ctx.user.id)).orderBy(desc(teachers.createdAt));
     }),
-    create: protectedProcedure.input(z.object({ fullName: z.string().trim().min(2).max(160), subject: z.string().trim().min(1).max(120), phone: z.string().trim().max(32).optional().nullable(), monthlyCost: z.number().int().nonnegative().default(0), notes: optionalText })).mutation(async ({ ctx, input }) => {
+    create: protectedProcedure.input(z.object({ fullName: z.string().trim().min(2).max(160), subject: z.string().trim().min(1).max(120), phone: z.string().trim().max(32).optional().nullable(), whatsapp: z.string().trim().max(32).optional().nullable(), monthlyCost: z.number().int().nonnegative().default(0), availability: z.string().trim().max(160).optional().nullable(), notes: optionalText })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
       const result = await db.insert(teachers).values({ ...input, ownerId: ctx.user.id }).returning({ id: teachers.id });
       return { id: Number(result[0]?.id), success: true } as const;
@@ -351,7 +351,7 @@ export const smartSecurityRouter = router({
       if (input?.childId) filters.push(eq(lessons.childId, input.childId));
       return db.select().from(lessons).where(and(...filters)).orderBy(desc(lessons.lessonDate));
     }),
-    create: protectedProcedure.input(z.object({ childId: z.number().int().positive(), teacherId: z.number().int().positive().optional().nullable(), subject: z.string().trim().min(1).max(120), lessonDate: dateValue, durationMinutes: z.number().int().positive().max(600).default(60), cost: z.number().int().nonnegative().default(0), status: z.enum(["scheduled", "completed", "cancelled"]).default("scheduled"), notes: optionalText })).mutation(async ({ ctx, input }) => {
+    create: protectedProcedure.input(z.object({ childId: z.number().int().positive(), teacherId: z.number().int().positive().optional().nullable(), subject: z.string().trim().min(1).max(120), lessonDate: dateValue, durationMinutes: z.number().int().positive().max(600).default(60), weekDay: z.string().trim().max(30).optional().nullable(), cost: z.number().int().nonnegative().default(0), paidAmount: z.number().int().nonnegative().default(0), status: z.enum(["scheduled", "completed", "cancelled"]).default("scheduled"), notes: optionalText })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
       const result = await db.insert(lessons).values({ ...input, ownerId: ctx.user.id }).returning({ id: lessons.id });
       return { id: Number(result[0]?.id), success: true } as const;
