@@ -5,11 +5,15 @@ import Home from "./Home";
 
 const setLocation = vi.fn();
 let currentPath = "/";
+const snapshotState = { data: undefined as unknown, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() };
 vi.mock("wouter", () => ({
   useLocation: () => [currentPath, setLocation],
 }));
 vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
+}));
+vi.mock("@/_core/hooks/useAuth", () => ({
+  useAuth: () => ({ user: { id: "cloud-user" }, loading: false, isAuthenticated: true, error: null, logout: vi.fn(), refresh: vi.fn() }),
 }));
 vi.mock("@/lib/trpc", () => ({
   trpc: {
@@ -19,7 +23,7 @@ vi.mock("@/lib/trpc", () => ({
       logout: { useMutation: () => ({ mutateAsync: vi.fn(async () => undefined), isPending: false, error: null }) },
     },
     smartSecurity: {
-      snapshot: { useQuery: () => ({ data: undefined, isLoading: false, isError: false, refetch: vi.fn() }) },
+      snapshot: { useQuery: () => snapshotState },
       save: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
       uploadImage: { useMutation: () => ({ mutateAsync: vi.fn(async ({ dataUrl }: { dataUrl: string }) => ({ url: dataUrl })) }) },
     },
@@ -31,6 +35,10 @@ describe("صفحة إدارة الأمن في الإدارة الذكية", () =
     localStorage.clear();
     setLocation.mockReset();
     currentPath = "/";
+    snapshotState.data = undefined;
+    snapshotState.isLoading = false;
+    snapshotState.isFetching = false;
+    snapshotState.isError = false;
   });
 
   afterEach(() => cleanup());
@@ -50,6 +58,15 @@ describe("صفحة إدارة الأمن في الإدارة الذكية", () =
     expect(screen.getByText("رقم السلاح")).toBeTruthy();
     expect(screen.getByText("انتهاء الرخصة")).toBeTruthy();
     expect(screen.getByText("تاريخ الخروج على المعاش")).toBeTruthy();
+  });
+
+  it("تعرض اتصال PostgreSQL والمزامنة التلقائية في الإعدادات عند نجاح snapshot", () => {
+    currentPath = "/settings";
+    snapshotState.data = { staff: [], workLocations: [], attendance: [], patrols: [], patrolPlans: [], entries: [], debts: [], children: [], teachers: [], lessons: [], vehicles: [], vehicleVisits: [] };
+    render(<Home />);
+    expect(screen.getAllByText(/متصل بالسحابة \(PostgreSQL\)/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/المزامنة التلقائية فعالة كل 10 ثوانٍ/)).toBeTruthy();
+    expect(screen.queryByText(/تُحفظ السجلات في PostgreSQL لمزامنتها بين الأجهزة عند تسجيل الدخول/)).toBeNull();
   });
 
   it("تفتح نافذة خطة المرور الشهرية من قسم الأمن", () => {
