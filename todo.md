@@ -303,7 +303,14 @@
 
 
 ## الرفع إلى smart-security-app
-- [ ] توجيه origin إلى smart-security-app.
-- [ ] توحيد الفرع المحلي على main.
-- [ ] تنفيذ force push إلى smart-security-app/main.
-- [ ] التحقق من آخر commit والرابط البعيد ونظافة شجرة العمل.
+- [x] توجيه origin إلى smart-security-app.
+- [x] توحيد الفرع المحلي على main.
+- [x] تنفيذ force push إلى smart-security-app/main.
+- [x] التحقق من آخر commit والرابط البعيد ونظافة شجرة العمل.
+
+
+## إعادة محاولة رفع smart-security-app بالرمز الجديد
+- [x] ضبط origin باستخدام الرابط المزوّد بالرمز الجديد.
+- [x] توحيد الفرع المحلي على main.
+- [x] تنفيذ git push -u origin main --force.
+- [x] التحقق من نتيجة الرفع وإزالة الرمز من origin بعد المحاولة.
