@@ -3,11 +3,11 @@ import path from "node:path";
 import { runInNewContext } from "node:vm";
 import { describe, expect, it, vi } from "vitest";
 
-type FetchHandler = (event: { request: Request; respondWith: (response: Promise<unknown>) => void }) => void;
+type FetchHandler = (event: { request: Request; respondWith: (response: Promise<unknown>) => void; waitUntil: (promise: Promise<unknown>) => void }) => void;
 
 function loadServiceWorker(fetchImplementation: ReturnType<typeof vi.fn>, cachedRoot: unknown, offlinePage: unknown) {
   const handlers = new Map<string, FetchHandler>();
-  const cache = { addAll: vi.fn(), put: vi.fn(), match: vi.fn(async (request: Request | string) => request === "/" ? cachedRoot : offlinePage) };
+  const cache = { addAll: vi.fn(), put: vi.fn(), match: vi.fn(async () => cachedRoot) };
   const caches = {
     open: vi.fn(async () => cache),
     keys: vi.fn(async () => []),
@@ -21,7 +21,7 @@ function loadServiceWorker(fetchImplementation: ReturnType<typeof vi.fn>, cached
     location: { origin: "https://smart-security.test" },
   };
   const source = readFileSync(path.resolve(import.meta.dirname, "../client/public/sw.js"), "utf8");
-  runInNewContext(source, { self, caches, fetch: fetchImplementation, URL, Promise });
+  runInNewContext(source, { self, caches, fetch: fetchImplementation, URL, Promise, Response });
   return { fetchHandler: handlers.get("fetch")!, caches };
 }
 
@@ -30,6 +30,7 @@ async function executeNavigation(handler: FetchHandler) {
   handler({
     request: { method: "GET", mode: "navigate", url: "https://smart-security.test/" } as Request,
     respondWith: response => { responsePromise = response; },
+    waitUntil: vi.fn(),
   });
   return responsePromise;
 }
@@ -68,28 +69,27 @@ describe("عامل خدمة الإدارة الذكية القابل للتثب�
 
   it("لا يخزن طلبات API داخل غلاف التطبيق", () => {
     const source = readFileSync(path.resolve(import.meta.dirname, "../client/public/sw.js"), "utf8");
-    expect(source).toContain('if (requestUrl.pathname.startsWith("/api/")) return;');
+    expect(source).toContain('requestUrl.pathname.startsWith("/api/")');
   });
 
-  it("يعرض نسخة الشبكة الحديثة لمسار التطبيق ويحدّث الكاش، ثم يستخدم المخزنة عند انقطاع الاتصال", async () => {
+  it("يعرض النسخة المخزنة فوراً ويحدّثها في الخلفية", async () => {
     const networkResponse = { ok: true, clone: () => networkResponse };
     const cachedRoot = { cached: true };
     const fetchImplementation = vi.fn(async () => networkResponse);
     const { fetchHandler, caches } = loadServiceWorker(fetchImplementation, cachedRoot, { offline: true });
 
-    await expect(executeNavigation(fetchHandler)).resolves.toBe(networkResponse);
+    await expect(executeNavigation(fetchHandler)).resolves.toBe(cachedRoot);
     await Promise.resolve();
     expect(fetchImplementation).toHaveBeenCalledOnce();
-    expect(caches.match).toHaveBeenCalledWith("/");
+    expect(caches.open).toHaveBeenCalledWith("smart-security-life-shell-v3");
   });
 
-  it("يعرض صفحة عدم الاتصال عند فشل الشبكة وعدم وجود نسخة من المسار", async () => {
+  it("يعرض استجابة 503 عند فشل الشبكة وعدم وجود نسخة مخزنة", async () => {
     const offlinePage = { offline: true };
     const fetchImplementation = vi.fn(async () => { throw new Error("offline"); });
     const { fetchHandler, caches } = loadServiceWorker(fetchImplementation, undefined, offlinePage);
 
-    await expect(executeNavigation(fetchHandler)).resolves.toBe(offlinePage);
-    expect(caches.match).toHaveBeenCalledWith("/");
-    expect(caches.match).toHaveBeenCalledWith("/offline.html");
+    const response = await executeNavigation(fetchHandler) as Response;
+    expect(response?.status).toBe(503);
   });
 });

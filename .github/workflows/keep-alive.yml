@@ -1,0 +1,20 @@
+name: Keep Render service awake
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Ping production health endpoint
+        run: >-
+          curl --fail --silent --show-error --location
+          --connect-timeout 10 --max-time 30
+          https://smart-security-life.onrender.com/api/health

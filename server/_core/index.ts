@@ -37,7 +37,12 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-  // Lightweight health endpoint used by external uptime checks.
+  // Minimal health endpoint for external uptime checks; it does not touch the database.
+  app.get("/api/health", (_req, res) => {
+    res.status(200).json({ status: "ok" });
+  });
+
+  // Backward-compatible health endpoint used by existing monitors.
   app.get("/api/ping", (_req, res) => {
     res.status(200).json(getPingPayload());
   });

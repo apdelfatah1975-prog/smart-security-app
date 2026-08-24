@@ -1,13 +1,20 @@
-const CACHE_NAME = "smart-security-life-shell-v2";
-const APP_SHELL = ["/",
-  "/manifest.json",
-  "/icon.png",
-  "/icon-512.png",
-];
+const CACHE_NAME = "smart-security-life-shell-v3";
+const APP_SHELL = ["/", "/manifest.json", "/icon.png", "/icon-512.png"];
+
+async function refreshCache(request, cache) {
+  try {
+    const response = await fetch(request, { cache: "no-store" });
+    if (response.ok) await cache.put(request, response.clone());
+    return response;
+  } catch {
+    return null;
+  }
+}
 
 self.addEventListener("install", event => {
-  self.skipWaiting();
-  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)));
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()),
+  );
 });
 
 self.addEventListener("activate", event => {
@@ -23,44 +30,22 @@ self.addEventListener("fetch", event => {
   if (event.request.method !== "GET") return;
 
   const requestUrl = new URL(event.request.url);
-  if (requestUrl.origin !== self.location.origin) return;
-  if (requestUrl.pathname.startsWith("/api/")) return;
+  if (requestUrl.origin !== self.location.origin || requestUrl.pathname.startsWith("/api/")) return;
 
-  if (event.request.mode === "navigate") {
-    event.respondWith((async () => {
-      const cache = await caches.open(CACHE_NAME);
-      const cachedRoot = requestUrl.pathname === "/" ? caches.match("/") : cache.match("/");
-      try {
-        const response = await fetch(event.request, { cache: "no-store" });
-        if (response.ok) {
-          await cache.put(event.request, response.clone());
-          if (requestUrl.pathname === "/") await cache.put("/", response.clone());
-        }
-        return response;
-      } catch {
-        const cachedRoute = requestUrl.pathname === "/" ? undefined : await cache.match(event.request);
-        return cachedRoute || (await cachedRoot) || (await caches.match("/offline.html"));
-      }
-    })());
-    return;
-  }
+  event.respondWith((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    const cached = await cache.match(event.request) || (event.request.mode === "navigate" ? await cache.match("/") : null);
+    const refresh = refreshCache(event.request, cache);
+    event.waitUntil(refresh);
 
-  // Never let an old hashed JS/CSS asset block a newly deployed application.
-  if (requestUrl.pathname.startsWith("/assets/") || requestUrl.pathname.endsWith(".js") || requestUrl.pathname.endsWith(".css")) {
-    event.respondWith((async () => {
-      const cache = await caches.open(CACHE_NAME);
-      try {
-        const response = await fetch(event.request, { cache: "no-store" });
-        if (response.ok) await cache.put(event.request, response.clone());
-        return response;
-      } catch {
-        return (await cache.match(event.request)) || Response.error();
-      }
-    })());
-    return;
-  }
-
-  event.respondWith(caches.match(event.request).then(cached => cached || fetch(event.request)));
+    if (cached) return cached;
+    const networkResponse = await refresh;
+    if (networkResponse) return networkResponse;
+    return new Response("التطبيق غير متاح حالياً دون اتصال", {
+      status: 503,
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
+  })());
 });
 
 self.addEventListener("sync", event => {
