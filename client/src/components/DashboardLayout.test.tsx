@@ -18,8 +18,8 @@ describe("compact dashboard layout", () => {
     const main = screen.getByRole("main");
 
     expect(shell).toBeTruthy();
-    expect(main.className).toContain("px-2");
-    expect(main.className).toContain("py-3");
+    expect(main.className).toContain("px-1");
+    expect(main.className).toContain("py-1");
     expect(screen.getByRole("navigation", { name: "التنقل السريع" })).toBeTruthy();
     expect(screen.getByText("محتوى الصفحة")).toBeTruthy();
   });

@@ -41,8 +41,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </aside>
       {open && <button aria-label="إغلاق القائمة" onClick={() => setOpen(false)} className="fixed inset-0 z-30 bg-slate-950/35 lg:hidden" />}
       <div className="lg:mr-[18rem]">
-        <header className="sticky top-0 z-20 border-b border-teal-100/80 bg-[#f4f8f7]/90 px-2.5 py-2 backdrop-blur-xl sm:px-3"><div className="mx-auto flex max-w-7xl items-center justify-between gap-2"><div className="flex items-center gap-3"><button aria-label="فتح القائمة" onClick={() => setOpen(true)} className="grid h-11 w-11 place-items-center rounded-2xl bg-white text-teal-800 shadow-sm lg:hidden"><Menu className="h-5 w-5" /></button><div><p className="text-xs font-black text-teal-700">لوحة الإدارة</p><h1 className="text-lg font-black text-slate-950 sm:text-xl">{active.label}</h1></div></div><span className={`grid h-11 w-11 place-items-center rounded-2xl shadow-sm ${active.accent}`}><ActiveIcon className="h-5 w-5" /></span></div></header>
-        <main className="mx-auto max-w-7xl px-2 py-3 pb-24 sm:px-3 sm:py-4 lg:pb-5">{children}</main>
+        <header className="sticky top-0 z-20 border-b border-teal-100/80 bg-[#f4f8f7]/90 px-1 py-1.5 backdrop-blur-xl sm:px-2"><div className="mx-auto flex max-w-7xl items-center justify-between gap-2"><div className="flex items-center gap-3"><button aria-label="فتح القائمة" onClick={() => setOpen(true)} className="grid h-11 w-11 place-items-center rounded-2xl bg-white text-teal-800 shadow-sm lg:hidden"><Menu className="h-5 w-5" /></button><div><p className="text-xs font-black text-teal-700">لوحة الإدارة</p><h1 className="text-lg font-black text-slate-950 sm:text-xl">{active.label}</h1></div></div><span className={`grid h-11 w-11 place-items-center rounded-2xl shadow-sm ${active.accent}`}><ActiveIcon className="h-5 w-5" /></span></div></header>
+        <main className="mx-auto w-full max-w-7xl px-1 py-1 pb-24 sm:px-2 sm:py-2 lg:pb-4">{children}</main>
       </div>
       <BottomNavigation />
     </div>

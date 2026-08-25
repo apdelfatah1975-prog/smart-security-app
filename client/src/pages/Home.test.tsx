@@ -95,3 +95,19 @@ describe("صفحة إدارة الأمن في الإدارة الذكية", () =
     expect(screen.getByText(/انتقال إلى فرع النيل/)).toBeTruthy();
   });
 });
+
+
+it("تستخدم البطاقة الرئيسية تخطيطاً مدمجاً دون فراغات واسعة", () => {
+  currentPath = "/";
+  localStorage.clear();
+  render(<Home />);
+  const heading = screen.getByText("إدارة حياتك العملية واليومية بوضوح");
+  const hero = heading.parentElement?.parentElement?.parentElement;
+  expect(hero).toBeTruthy();
+  expect(hero?.className).toContain("px-3");
+  expect(hero?.className).toContain("py-3");
+  expect(hero?.className).toContain("rounded-xl");
+  expect(hero?.className).not.toContain("p-6");
+  expect(hero?.className).not.toContain("p-8");
+  expect(hero?.querySelector(".flex.flex-col.gap-2")).toBeTruthy();
+});
