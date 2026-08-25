@@ -239,3 +239,33 @@
 @media (max-width: 767px) {
   .app-shell :where(p, li, td, th, label, input, textarea, select, button, [role="button"]) { font-size: 1.08rem; }
 }
+
+/* تحسين نهائي للوضوح والألوان الزاهية */
+@layer components {
+  .app-shell { font-size: 1.3rem; }
+  .app-shell :where(p, li, td, th, label, input, textarea, select, button, [role="button"]) {
+    font-size: 1.3rem !important;
+    line-height: 1.75;
+    color: #000 !important;
+  }
+  .app-shell :where(h1, h2, h3, h4, h5, h6, strong, b, .font-bold, .font-extrabold, .font-black) {
+    font-weight: 900 !important;
+    color: #000 !important;
+  }
+  .app-shell .text-muted-foreground,
+  .app-shell .text-slate-500,
+  .app-shell .text-slate-600 { color: #111827 !important; }
+  .app-shell .quick-action:nth-child(1) { background: #10B981 !important; border-color: #059669 !important; color: #fff !important; }
+  .app-shell .quick-action:nth-child(2) { background: #F97316 !important; border-color: #EA580C !important; color: #fff !important; }
+  .app-shell .quick-action:nth-child(3) { background: #8B5CF6 !important; border-color: #7C3AED !important; color: #fff !important; }
+  .app-shell .quick-action:nth-child(4) { background: #3B82F6 !important; border-color: #2563EB !important; color: #fff !important; }
+  .app-shell .quick-action > span:first-child { background: rgb(255 255 255 / .24) !important; color: #fff !important; }
+  .app-shell .quick-action b,
+  .app-shell .quick-action small,
+  .app-shell .quick-action svg,
+  .app-shell .quick-action [class*="text-"] { color: #fff !important; font-weight: 900 !important; }
+}
+@media (max-width: 640px) {
+  .app-shell { font-size: 1.2rem; }
+  .app-shell :where(p, li, td, th, label, input, textarea, select, button, [role="button"]) { font-size: 1.18rem !important; }
+}
