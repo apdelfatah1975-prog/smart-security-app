@@ -72,6 +72,20 @@ describe("صفحة إدارة الأمن في الإدارة الذكية", () =
     expect(screen.queryByText(/تُحفظ السجلات في PostgreSQL لمزامنتها بين الأجهزة عند تسجيل الدخول/)).toBeNull();
   });
 
+  it("تفتح تبويب الديون مباشرة من رابط المالية", () => {
+    currentPath = "/finance?tab=debts";
+    render(<Home />);
+    expect(screen.getByRole("tab", { name: "سجل الديون والمستحقات" }).getAttribute("data-state")).toBe("active");
+    expect(screen.getByText("دفتر الديون فارغ")).toBeTruthy();
+  });
+
+  it("تحدّث رابط المالية عند العودة إلى تبويب الخزينة", () => {
+    currentPath = "/finance?tab=debts";
+    render(<Home />);
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "الخزينة والحركات المالية" }));
+    expect(setLocation).toHaveBeenCalledWith("/finance");
+  });
+
   it("تفتح نافذة خطة المرور الشهرية من قسم الأمن", () => {
     currentPath = "/security";
     render(<Home />);

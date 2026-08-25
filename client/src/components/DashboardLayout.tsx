@@ -1,13 +1,12 @@
 import React from "react";
 import { Link, useLocation } from "wouter";
-import { BarChart3, BookOpenCheck, CarFront, ChevronLeft, CircleDollarSign, Menu, Settings, ShieldCheck, WalletCards, X } from "lucide-react";
+import { BarChart3, BookOpenCheck, CarFront, ChevronLeft, CircleDollarSign, Menu, Settings, ShieldCheck, X } from "lucide-react";
 import BottomNavigation from "./BottomNavigation";
 
 export const items = [
   { path: "/", label: "الرئيسية", icon: BarChart3, accent: "bg-teal-50 text-teal-700" },
   { path: "/security", label: "إدارة الأمن", icon: ShieldCheck, accent: "bg-sky-50 text-sky-700" },
   { path: "/finance", label: "المالية اليومية", icon: CircleDollarSign, accent: "bg-amber-50 text-amber-700" },
-  { path: "/debts", label: "دفتر الديون", icon: WalletCards, accent: "bg-rose-50 text-rose-700" },
   { path: "/education", label: "الأبناء والدروس", icon: BookOpenCheck, accent: "bg-violet-50 text-violet-700" },
   { path: "/vehicles", label: "مركباتي", icon: CarFront, accent: "bg-cyan-50 text-cyan-700" },
   { path: "/reports", label: "التقارير", icon: BarChart3, accent: "bg-emerald-50 text-emerald-700" },
@@ -17,7 +16,7 @@ export const items = [
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [open, setOpen] = React.useState(false);
-  const active = items.find(item => item.path === location) || items[0];
+  const active = items.find(item => item.path === "/" ? location === "/" : location.startsWith(item.path)) || items[0];
   const ActiveIcon = active.icon;
   return (
     <div dir="rtl" className="app-shell compact-layout min-h-[100dvh] bg-[#f4f8f7] text-slate-950">
@@ -33,7 +32,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <nav className="mt-5 flex-1 space-y-1" aria-label="القائمة الرئيسية">
           {items.map(item => {
             const Icon = item.icon;
-            const isActive = location === item.path;
+            const isActive = item.path === "/" ? location === "/" : location.startsWith(item.path);
             return <Link key={item.path} href={item.path} onClick={() => setOpen(false)} className={`group flex min-h-12 items-center gap-3 rounded-2xl px-4 py-3 text-sm font-black ${isActive ? "bg-white text-teal-900 shadow-[0_12px_26px_rgba(0,0,0,.14)]" : "text-teal-50 hover:bg-white/10"}`}><span className={`grid h-9 w-9 place-items-center rounded-xl ${isActive ? "bg-teal-50 text-teal-700" : "bg-white/10 text-teal-100"}`}><Icon className="h-5 w-5" /></span><span>{item.label}</span>{isActive && <ChevronLeft className="mr-auto h-4 w-4" />}</Link>;
           })}
         </nav>
