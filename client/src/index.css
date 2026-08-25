@@ -41,19 +41,19 @@
 :root {
   --radius: 0.9rem;
   --background: oklch(0.985 0.008 174);
-  --foreground: oklch(0.25 0.025 182);
+  --foreground: #111827;
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.25 0.025 182);
+  --card-foreground: #111827;
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.25 0.025 182);
+  --popover-foreground: #111827;
   --primary: oklch(0.50 0.10 181);
   --primary-foreground: oklch(0.99 0.01 174);
   --secondary: oklch(0.95 0.026 174);
-  --secondary-foreground: oklch(0.31 0.05 181);
+  --secondary-foreground: #111827;
   --muted: oklch(0.96 0.012 180);
-  --muted-foreground: oklch(0.52 0.03 181);
+  --muted-foreground: #374151;
   --accent: oklch(0.93 0.04 168);
-  --accent-foreground: oklch(0.28 0.055 174);
+  --accent-foreground: #111827;
   --destructive: oklch(0.58 0.20 26);
   --destructive-foreground: oklch(0.99 0 0);
   --border: oklch(0.9 0.02 176);
@@ -80,7 +80,7 @@
   * { @apply border-border outline-ring/50; }
   html, body, #root { width: 100%; max-width: 100%; overflow-x: hidden; }
   html { direction: rtl; font-size: 17px; }
-  body { @apply min-w-0 overflow-x-hidden bg-background text-foreground font-sans; font-size: 1rem; line-height: 1.75; text-rendering: optimizeLegibility; }
+  body { @apply min-w-0 overflow-x-hidden bg-background text-foreground font-sans; font-size: 1.15rem; line-height: 1.8; font-weight: 500; text-rendering: optimizeLegibility; }
   button:not(:disabled), [role="button"]:not([aria-disabled="true"]), [type="button"]:not(:disabled), [type="submit"]:not(:disabled), a[href], select:not(:disabled) { @apply cursor-pointer; }
 }
 
@@ -221,7 +221,21 @@
 }
 @media (max-width: 767px) {
   .app-shell main { padding-inline: .85rem; }
-  .app-shell .page-heading { font-size: 1.55rem !important; }
-  .app-shell .page-subheading { font-size: .98rem !important; }
+  .app-shell .page-heading { font-size: 1.65rem !important; font-weight: 900 !important; }
+  .app-shell .page-subheading { font-size: 1.08rem !important; }
   .app-shell .soft-card { border-radius: 1.25rem; }
+}
+
+/* وضوح عربي موحد: Cairo، نص أكبر، وألوان داكنة مناسبة لشاشات الهاتف */
+@layer components {
+  .app-shell { color: #111827; font-family: "Cairo", ui-sans-serif, system-ui, sans-serif; }
+  .app-shell :where(p, li, td, th, label, input, textarea, select, button, [role="button"]) { font-size: 1.05rem; line-height: 1.8; }
+  .app-shell :where(td, th) { font-weight: 600; color: #111827; }
+  .app-shell :where(h1, h2, h3, h4, h5, h6, strong, b, .font-bold, .font-extrabold, .font-black) { font-weight: 800; color: #111827; }
+  .app-shell .text-muted-foreground { color: #374151 !important; }
+  .app-shell .text-foreground, .app-shell .text-card-foreground { color: #111827 !important; }
+}
+
+@media (max-width: 767px) {
+  .app-shell :where(p, li, td, th, label, input, textarea, select, button, [role="button"]) { font-size: 1.08rem; }
 }
