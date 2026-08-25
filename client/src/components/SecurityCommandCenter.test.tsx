@@ -4,7 +4,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { SecurityCommandCenter } from "./SecurityCommandCenter";
 
 const baseProps = {
-  attendance: [],
   patrolPlans: [],
   workLocations: [],
   patrolQuery: "",
@@ -12,7 +11,7 @@ const baseProps = {
   onSharePatrol: vi.fn(),
   onOpenStaff: vi.fn(),
   onAddStaff: vi.fn(),
-  onAddAttendance: vi.fn(),
+  onBulkImport: vi.fn(),
   onAddPatrol: vi.fn(),
   onAddPlan: vi.fn(),
   onImportPlan: vi.fn(),
@@ -35,6 +34,30 @@ describe("SecurityCommandCenter location cards", () => {
     expect(screen.getAllByText("أحمد مطوبس").length).toBeGreaterThan(0);
     expect(screen.getByText(/١ فرد معروض/)).toBeTruthy();
     expect(screen.getAllByRole("button", { name: /أحمد مطوبس/ }).length).toBeGreaterThan(0);
+  });
+
+  it("keeps the security header compact and exposes both quick actions", () => {
+    const onAddStaff = vi.fn();
+    const onBulkImport = vi.fn();
+    render(<SecurityCommandCenter {...baseProps} onAddStaff={onAddStaff} onBulkImport={onBulkImport} staff={[]} />);
+
+    expect(screen.getByRole("heading", { name: "الحراس والأفراد" })).toBeTruthy();
+    expect(screen.queryByText("مركز التشغيل اليومي")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /فرد جديد/ }));
+    fireEvent.click(screen.getByRole("button", { name: /استيراد مجمع/ }));
+    expect(onAddStaff).toHaveBeenCalledTimes(1);
+    expect(onBulkImport).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders clean staff cards with working contact actions", () => {
+    render(<SecurityCommandCenter {...baseProps} staff={[{ id: "1", name: "حارس تجريبي", branch: "فرع مطوبس", phone: "01012345678", active: true }]} />);
+
+    expect(screen.getAllByText("حارس تجريبي").some((element) => element.className.includes("text-base"))).toBe(true);
+    expect(screen.getByText("نشط")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "اتصال بـ حارس تجريبي" }).getAttribute("href")).toBe("tel:01012345678");
+    expect(screen.getByRole("link", { name: "واتساب حارس تجريبي" }).getAttribute("href")).toBe("https://wa.me/201012345678");
+    expect(screen.getByRole("button", { name: "نسخ بيانات حارس تجريبي" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "الملف" })).toBeTruthy();
   });
 
   it("opens the complete staff profile callback from a location result", () => {
