@@ -84,7 +84,7 @@ describe("صفحة إدارة الأمن في الإدارة الذكية", () =
   it("تفتح ملف فرد الأمن وتعرض ملخصه وسجله الزمني", () => {
     currentPath = "/security";
     localStorage.setItem("smart-security-life-v1", JSON.stringify({
-      staff: [{ id: "staff-1", code: "ح-001", name: "أحمد علي", phone: "01000000000", nationalId: "29901011234567", birthDate: "1999-01-01", branch: "فرع النيل", workStartDate: "2024-01-01", atm: "ATM 1", hireDate: "2024-01-01", rate: 5000, active: true, shift: "morning" }],
+      staff: [{ id: "staff-1", code: "ح-001", name: "أحمد علي", phone: "01000000000", nationalId: "29901011234567", birthDate: "1999-01-01", branch: "فرع النيل", workStartDate: "2024-01-01", hireDate: "2024-01-01", active: true, shift: "morning" }],
       workLocations: [{ id: "location-1", staffId: "staff-1", location: "فرع النيل", fromDate: "2024-01-01", notes: "تكليف" }],
       attendance: [{ id: "attendance-1", staffId: "staff-1", date: "2026-08-24", shift: "morning", status: "present", hours: 8 }],
       patrols: [], patrolPlans: [], entries: [], debts: [], children: [], teachers: [], lessons: [], vehicles: [], vehicleVisits: [], settings: { name: "الإدارة الذكية", branch: "" },

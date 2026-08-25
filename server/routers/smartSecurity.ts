@@ -34,7 +34,6 @@ const staffInput = z.object({
   nationalId: z.string().trim().max(32).optional().nullable(),
   phone: z.string().trim().max(32).optional().nullable(),
   branch: z.string().trim().min(1).max(120),
-  atmLocation: z.string().trim().max(160).optional().nullable(),
   shift: z.enum(["morning", "evening", "night", "off"]).optional().nullable(),
   hireDate: dateValue.optional().nullable(),
   workStartDate: dateValue.optional().nullable(),
@@ -45,7 +44,6 @@ const staffInput = z.object({
   licenseNumber: z.string().trim().max(80).optional().nullable(),
   licenseExpiry: dateValue.optional().nullable(),
   retirementDate: dateValue.optional().nullable(),
-  monthlyRate: z.number().int().nonnegative().default(0),
   isActive: z.boolean().default(true),
   notes: optionalText,
 });
@@ -103,7 +101,7 @@ export const smartSecurityRouter = router({
     const requiredId = (key: string) => { const value = numericId(key); if (!value) throw new TRPCError({ code: "BAD_REQUEST", message: "المعرف المرتبط بالسجل غير صالح." }); return value; };
     const date = (key: string) => { const value = text(key); return value ? new Date(value) : null; };
     if (input.entity === "staff") {
-      const result = await db.insert(securityStaff).values({ ownerId, staffCode: text("code") || `staff-${Date.now()}`, fullName: text("name") || "فرد أمن", nationalId: text("nationalId"), phone: text("phone"), branch: text("branch") || "غير محدد", atmLocation: text("atm"), shift: (text("shift") as "morning" | "evening" | "night" | "off" | null) || "morning", hireDate: date("hireDate"), workStartDate: date("workStartDate"), emergencyPhone: text("emergencyPhone"), photoUrl: text("image")?.startsWith("http") || text("image")?.startsWith("/manus-storage/") ? text("image") : null, licenseStatus: text("licenseStatus") === "licensed" ? "licensed" : "unlicensed", weaponNumber: text("weaponNumber"), licenseNumber: text("licenseNumber"), licenseExpiry: date("licenseExpiry"), retirementDate: date("retirementDate"), monthlyRate: Number(p.rate) || 0, isActive: p.active !== false, notes: text("notes") }).returning({ id: securityStaff.id });
+      const result = await db.insert(securityStaff).values({ ownerId, staffCode: text("code") || `staff-${Date.now()}`, fullName: text("name") || "فرد أمن", nationalId: text("nationalId"), phone: text("phone"), branch: text("branch") || "غير محدد", shift: (text("shift") as "morning" | "evening" | "night" | "off" | null) || "morning", hireDate: date("hireDate"), workStartDate: date("workStartDate"), emergencyPhone: text("emergencyPhone"), photoUrl: text("image")?.startsWith("http") || text("image")?.startsWith("/manus-storage/") ? text("image") : null, licenseStatus: text("licenseStatus") === "licensed" ? "licensed" : "unlicensed", weaponNumber: text("weaponNumber"), licenseNumber: text("licenseNumber"), licenseExpiry: date("licenseExpiry"), retirementDate: date("retirementDate"), isActive: p.active !== false, notes: text("notes") }).returning({ id: securityStaff.id });
       return { entity: input.entity, id: Number(result[0]?.id), success: true } as const;
     }
     if (input.entity === "attendance") {
@@ -162,7 +160,7 @@ export const smartSecurityRouter = router({
     const requiredId = (key: string) => { const value = numericId(key); if (!value) throw new TRPCError({ code: "BAD_REQUEST", message: "المعرف المرتبط بالسجل غير صالح." }); return value; };
     const date = (key: string) => { const value = text(key); return value ? new Date(value) : null; };
     if (input.entity === "staff") {
-      await db.update(securityStaff).set({ staffCode: text("code") || `staff-${input.id}`, fullName: text("name") || "فرد أمن", nationalId: text("nationalId"), phone: text("phone"), branch: text("branch") || "غير محدد", atmLocation: text("atm"), shift: (text("shift") as "morning" | "evening" | "night" | "off" | null) || "morning", hireDate: date("hireDate"), workStartDate: date("workStartDate"), emergencyPhone: text("emergencyPhone"), photoUrl: text("image")?.startsWith("http") || text("image")?.startsWith("/manus-storage/") ? text("image") : null, licenseStatus: text("licenseStatus") === "licensed" ? "licensed" : "unlicensed", weaponNumber: text("weaponNumber"), licenseNumber: text("licenseNumber"), licenseExpiry: date("licenseExpiry"), retirementDate: date("retirementDate"), monthlyRate: Number(p.rate) || 0, isActive: p.active !== false, notes: text("notes") }).where(and(eq(securityStaff.id, input.id), eq(securityStaff.ownerId, ownerId)));
+      await db.update(securityStaff).set({ staffCode: text("code") || `staff-${input.id}`, fullName: text("name") || "فرد أمن", nationalId: text("nationalId"), phone: text("phone"), branch: text("branch") || "غير محدد", shift: (text("shift") as "morning" | "evening" | "night" | "off" | null) || "morning", hireDate: date("hireDate"), workStartDate: date("workStartDate"), emergencyPhone: text("emergencyPhone"), photoUrl: text("image")?.startsWith("http") || text("image")?.startsWith("/manus-storage/") ? text("image") : null, licenseStatus: text("licenseStatus") === "licensed" ? "licensed" : "unlicensed", weaponNumber: text("weaponNumber"), licenseNumber: text("licenseNumber"), licenseExpiry: date("licenseExpiry"), retirementDate: date("retirementDate"), isActive: p.active !== false, notes: text("notes") }).where(and(eq(securityStaff.id, input.id), eq(securityStaff.ownerId, ownerId)));
     } else if (input.entity === "attendance") {
       await db.update(securityAttendance).set({ staffId: requiredId("staffId"), attendanceDate: date("date") || new Date(), shift: (text("shift") as "morning" | "evening" | "night" | "off" | "leave") || "morning", status: (text("status") as "present" | "absent" | "excused") || "present", hours: Number(p.hours) || 0, notes: text("notes") }).where(and(eq(securityAttendance.id, input.id), eq(securityAttendance.ownerId, ownerId)));
     } else if (input.entity === "patrols") {

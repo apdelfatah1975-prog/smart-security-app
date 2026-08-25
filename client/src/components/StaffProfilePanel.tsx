@@ -10,9 +10,7 @@ type Staff = {
   birthDate?: string;
   branch: string;
   workStartDate?: string;
-  atm: string;
   hireDate: string;
-  rate: number;
   active: boolean;
   shift?: string;
   emergencyPhone?: string;

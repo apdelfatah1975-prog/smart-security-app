@@ -10,8 +10,6 @@ export type BulkStaffRow = {
   hireDate: string;
   active: boolean;
   shift: "morning" | "evening" | "night";
-  rate: number;
-  atm: string;
   emergencyPhone: string;
   image: string;
   notes: string;
@@ -58,6 +56,6 @@ export function parseBulkStaff(text: string): BulkStaffRow[] {
     const phone = phoneIndex >= 0 ? digits(columns[phoneIndex]) : digits(columns[2] || "");
     const branch = columns.find((column, i) => i !== nationalIndex && i !== phoneIndex && /فرع|شونة|مطوبس|فوه|برمبال|القومسيون|أبودراز|قبريط|الجزيرة|المرشد|السالمية/i.test(column)) || columns[3] || "";
     const details = nationalIdDetails(nationalId);
-    return [{ id: id() + index, code: "", name: columns[0], phone, nationalId, branch, ...details, hireDate: "", active: true, shift: "morning", rate: 0, atm: "", emergencyPhone: "", image: "", notes: "", licenseStatus: "unlicensed", weaponNumber: "", licenseNumber: "", licenseExpiry: "", retirementDate: details.retirementDate }];
+    return [{ id: id() + index, code: "", name: columns[0], phone, nationalId, branch, ...details, hireDate: "", active: true, shift: "morning", emergencyPhone: "", image: "", notes: "", licenseStatus: "unlicensed", weaponNumber: "", licenseNumber: "", licenseExpiry: "", retirementDate: details.retirementDate }];
   });
 }
