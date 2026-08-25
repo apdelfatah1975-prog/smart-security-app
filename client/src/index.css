@@ -227,3 +227,40 @@
 }
 
 /* مقاسات Cairo القياسية: تُستخدم أصناف Tailwind المحلية دون تكبير عام يسبب تداخل النصوص. */
+
+
+/* تخطيط مدمج موحّد: تقليل الفراغات مع الحفاظ على حد أدنى مريح لعناصر اللمس */
+@layer components {
+  .compact-layout main { padding-inline: .5rem; }
+  .compact-layout main > * + * { margin-block-start: .75rem; }
+  .compact-layout main [class~="gap-4"] { gap: .75rem !important; }
+  .compact-layout main [class~="gap-5"] { gap: .75rem !important; }
+  .compact-layout main [class~="gap-6"] { gap: 1rem !important; }
+  .compact-layout main [class~="space-y-6"] > :not([hidden]) ~ :not([hidden]) { margin-block-start: .75rem !important; }
+  .compact-layout main [class~="space-y-5"] > :not([hidden]) ~ :not([hidden]) { margin-block-start: .75rem !important; }
+  .compact-layout main [class~="space-y-4"] > :not([hidden]) ~ :not([hidden]) { margin-block-start: .625rem !important; }
+  .compact-layout main [class~="space-y-3"] > :not([hidden]) ~ :not([hidden]) { margin-block-start: .5rem !important; }
+  .compact-layout main [class~="p-7"],
+  .compact-layout main [class~="sm:p-7"] { padding: 1.25rem !important; }
+  .compact-layout main [class~="p-6"],
+  .compact-layout main [class~="sm:p-6"] { padding: 1rem !important; }
+  .compact-layout main [class~="p-5"],
+  .compact-layout main [class~="sm:p-5"] { padding: .875rem !important; }
+  .compact-layout main [class~="p-4"] { padding: .75rem !important; }
+  .compact-layout main [class~="px-6"],
+  .compact-layout main [class~="sm:px-6"] { padding-inline: 1rem !important; }
+  .compact-layout main [class~="px-5"] { padding-inline: .875rem !important; }
+  .compact-layout main [class~="px-4"] { padding-inline: .75rem !important; }
+  .compact-layout main [class~="py-6"],
+  .compact-layout main [class~="sm:py-6"] { padding-block: 1rem !important; }
+  .compact-layout main [class~="py-5"] { padding-block: .875rem !important; }
+  .compact-layout main [class~="py-4"] { padding-block: .75rem !important; }
+  .compact-layout .soft-card,
+  .compact-layout .dashboard-card { border-radius: 1rem; }
+}
+
+@media (max-width: 640px) {
+  .compact-layout main { padding-inline: .375rem; }
+  .compact-layout .page-heading { font-size: 1.45rem !important; }
+  .compact-layout .page-subheading { font-size: .95rem !important; line-height: 1.65 !important; }
+}
