@@ -36,6 +36,7 @@ type Props = {
   onSharePatrol: () => void;
   onOpenStaff: (staff: Staff) => void;
   onAddStaff: () => void;
+  onBulkImport?: () => void;
   onAddPatrol: () => void;
   onAddPlan: () => void;
   onImportPlan: () => void;
@@ -60,6 +61,7 @@ export function SecurityCommandCenter({
   onSharePatrol,
   onOpenStaff,
   onAddStaff,
+  onBulkImport,
   onAddPatrol,
   onAddPlan,
   onImportPlan,
@@ -115,6 +117,9 @@ export function SecurityCommandCenter({
           <div className="grid grid-cols-2 gap-2 sm:flex">
             <button type="button" onClick={onAddStaff} className="touch-action rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-900 shadow-sm transition active:scale-[.98]">
               <Plus className="ml-1 inline h-4 w-4" />فرد أمن
+            </button>
+            <button type="button" onClick={() => onBulkImport?.()} className="touch-action rounded-2xl bg-amber-300 px-4 py-3 text-sm font-black text-amber-950 shadow-sm transition active:scale-[.98]">
+              <ClipboardCheck className="ml-1 inline h-4 w-4" />بيان مجمع
             </button>
           </div>
         </div>
