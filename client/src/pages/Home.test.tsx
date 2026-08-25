@@ -45,10 +45,11 @@ describe("صفحة إدارة الأمن في الإدارة الذكية", () =
 
   afterEach(() => cleanup());
 
-  it("تعرض عنوان قسم الأمن وزر إضافة فرد أمن", () => {
+  it("تبدأ مباشرة بالإجراءات والإحصائيات دون اللافتة الخضراء الكبيرة", () => {
     render(<Home />);
-    expect(screen.getByText("إدارة حياتك العملية واليومية بوضوح")).toBeTruthy();
+    expect(screen.queryByText("إدارة حياتك العملية واليومية بوضوح")).toBeNull();
     expect(screen.getAllByText("إضافة فرد أمن").length).toBeGreaterThan(0);
+    expect(screen.getByText("نظرة سريعة")).toBeTruthy();
   });
 
   it("تفتح نموذج فرد الأمن وتعرض الحقول التشغيلية الموسعة", () => {
@@ -97,17 +98,11 @@ describe("صفحة إدارة الأمن في الإدارة الذكية", () =
 });
 
 
-it("تستخدم البطاقة الرئيسية تخطيطاً مدمجاً دون فراغات واسعة", () => {
+it("لا تعرض الصفحة الرئيسية Hero الأخضر أو حشوه القديم", () => {
   currentPath = "/";
   localStorage.clear();
   render(<Home />);
-  const heading = screen.getByText("إدارة حياتك العملية واليومية بوضوح");
-  const hero = heading.parentElement?.parentElement?.parentElement;
-  expect(hero).toBeTruthy();
-  expect(hero?.className).toContain("px-3");
-  expect(hero?.className).toContain("py-3");
-  expect(hero?.className).toContain("rounded-xl");
-  expect(hero?.className).not.toContain("p-6");
-  expect(hero?.className).not.toContain("p-8");
-  expect(hero?.querySelector(".flex.flex-col.gap-2")).toBeTruthy();
+  expect(screen.queryByText("إدارة حياتك العملية واليومية بوضوح")).toBeNull();
+  expect(document.querySelector(".smart-home > section.rounded-xl.bg-\\[linear-gradient")).toBeNull();
+  expect(document.querySelector(".smart-home")?.className).toContain("space-y-0");
 });
